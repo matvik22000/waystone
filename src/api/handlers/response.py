@@ -18,7 +18,9 @@ class AbstractResponse(abc.ABC):
             return StrResponse(res)
         else:
             if not isinstance(res, AbstractResponse):
-                raise TypeError("'AbstractResponse' or 'str' expected, but got %s" % res.__class__)
+                raise TypeError(
+                    "'AbstractResponse' or 'str' expected, but got %s" % res.__class__
+                )
             return res
 
 

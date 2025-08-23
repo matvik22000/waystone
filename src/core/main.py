@@ -26,11 +26,18 @@ def main():
             return None
 
     def start_crawling_in_thread():
-        Thread(target=crawl, args=(find_node_name_by_address, citations.update_citations), daemon=True).start()
+        Thread(
+            target=crawl,
+            args=(find_node_name_by_address, citations.update_citations),
+            daemon=True,
+        ).start()
 
     app.scheduler.every(5).minutes.do(
-        lambda: logging.getLogger("announce").debug("announce with data %s", CONFIG.ANNOUNCE_NAME) or dst.announce(
-            CONFIG.ANNOUNCE_NAME.encode("utf-8")))
+        lambda: logging.getLogger("announce").debug(
+            "announce with data %s", CONFIG.ANNOUNCE_NAME
+        )
+        or dst.announce(CONFIG.ANNOUNCE_NAME.encode("utf-8"))
+    )
     app.scheduler.every(1).hours.do(start_crawling_in_thread)
 
     register_filters()

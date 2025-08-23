@@ -12,7 +12,11 @@ from jinja2 import FileSystemLoader, Environment
 
 from src.api.context import init_context
 from src.api.exceptions import DoubleHandlerRegistration
-from src.api.handlers.expetion_handler import handle_exception_signature, base_handler, ExceptionHandler
+from src.api.handlers.expetion_handler import (
+    handle_exception_signature,
+    base_handler,
+    ExceptionHandler,
+)
 from src.api.handlers.handler import Handler, handle_func_signature
 from src.api.store import AbstractStore, JsonFileStore
 from src.config import CONFIG
@@ -22,7 +26,9 @@ from src.config import CONFIG
 class Config:
     templates_dir: str = field(default="templates")
     disable_templates: bool = field(default=False)
-    store: AbstractStore = field(default=JsonFileStore(os.path.join(CONFIG.STORAGE_PATH, "api_user_data.json")))
+    store: AbstractStore = field(
+        default=JsonFileStore(os.path.join(CONFIG.STORAGE_PATH, "api_user_data.json"))
+    )
 
     enable_propagation_node: bool = field(default=False)
     propagation_node_identity: RNS.Identity = field(default=None)
@@ -78,27 +84,36 @@ class NomadAPI:
             raise DoubleHandlerRegistration("Duplicate handler for path %s" % path)
         self._handlers[path] = handler
 
-    def _add_exception_handler(self, e_type: tp.Type[Exception], handler: handle_exception_signature):
+    def _add_exception_handler(
+        self, e_type: tp.Type[Exception], handler: handle_exception_signature
+    ):
         if e_type in self._exception_handlers:
-            raise DoubleHandlerRegistration("Duplicate handler for exception %s" % e_type.__name__)
+            raise DoubleHandlerRegistration(
+                "Duplicate handler for exception %s" % e_type.__name__
+            )
         self._exception_handlers[e_type] = handler
 
     def register_handlers(self, dst):
         for p, h in self._handlers.items():
             dst.deregister_request_handler(p)
-            dst.register_request_handler(p, self._wrap_handler(h), allow=RNS.Destination.ALLOW_ALL)
+            dst.register_request_handler(
+                p, self._wrap_handler(h), allow=RNS.Destination.ALLOW_ALL
+            )
 
     def _wrap_handler(self, handler: Handler):
         @wraps(handler)
-        def inner(path: str,
-                  data: tp.Optional[tp.Any],
-                  request_id: bytes,
-                  link_id: bytes,
-                  remote_identity: tp.Optional[bytes],
-                  requested_at: float
-                  ) -> tp.Optional[bytes]:
+        def inner(
+            path: str,
+            data: tp.Optional[tp.Any],
+            request_id: bytes,
+            link_id: bytes,
+            remote_identity: tp.Optional[bytes],
+            requested_at: float,
+        ) -> tp.Optional[bytes]:
             try:
-                return handler(path, data, request_id, link_id, remote_identity, requested_at)
+                return handler(
+                    path, data, request_id, link_id, remote_identity, requested_at
+                )
             except Exception as e:
                 return self._handle_exception(e)
 
@@ -127,20 +142,20 @@ class NomadAPI:
 #     return lxm_router
 
 
-def create_rns_dest(rns_configdir: str, identitypath: str) -> tp.Tuple[RNS.Destination, RNS.Identity]:
+def create_rns_dest(
+    rns_configdir: str, identitypath: str
+) -> tp.Tuple[RNS.Destination, RNS.Identity]:
     reticulum = RNS.Reticulum(rns_configdir)
     if os.path.exists(identitypath):
         identity = RNS.Identity.from_file(identitypath)
     else:
-        logging.getLogger("destination").info("Identity file %s not found, generating new" % identitypath)
+        logging.getLogger("destination").info(
+            "Identity file %s not found, generating new" % identitypath
+        )
         identity = RNS.Identity()
         os.makedirs(os.path.dirname(identitypath), exist_ok=True)
         identity.to_file(identitypath)
     dest = RNS.Destination(
-        identity,
-        RNS.Destination.IN,
-        RNS.Destination.SINGLE,
-        "nomadnetwork",
-        "node"
+        identity, RNS.Destination.IN, RNS.Destination.SINGLE, "nomadnetwork", "node"
     )
     return dest, identity

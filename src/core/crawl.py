@@ -24,11 +24,11 @@ import re
 # Компилируем регулярки один раз
 _RE_FB = re.compile(r"`[fb]")
 _RE_FB_CAPS = re.compile(r"`[FB]...")
-_RE_TAGS = re.compile(r'`<[^>]*>')
-_RE_COMMENT = re.compile(r'#.*$', flags=re.MULTILINE)
-_RE_GT_LINE_START = re.compile(r'^\s*>+', flags=re.MULTILINE)
-_RE_SPACES = re.compile(r'[ \t]+')
-_RE_PARAGRAPH = re.compile(r'\n\s*\n+')
+_RE_TAGS = re.compile(r"`<[^>]*>")
+_RE_COMMENT = re.compile(r"#.*$", flags=re.MULTILINE)
+_RE_GT_LINE_START = re.compile(r"^\s*>+", flags=re.MULTILINE)
+_RE_SPACES = re.compile(r"[ \t]+")
+_RE_PARAGRAPH = re.compile(r"\n\s*\n+")
 
 # Символы для удаления как `x`
 _MICRON_CHARS = "car!_=`"
@@ -78,9 +78,9 @@ def load(url: str) -> Document | None:
 
 
 def extract(
-        doc: Document | None,
-        get_name_by_address: Callable[[str], str | None] | None = None,
-        update_citations: Callable[[str, tp.List[str]], None] | None = None,
+    doc: Document | None,
+    get_name_by_address: Callable[[str], str | None] | None = None,
+    update_citations: Callable[[str, tp.List[str]], None] | None = None,
 ) -> tp.List[str]:
     if not doc:
         return []
@@ -95,7 +95,7 @@ def extract(
         text=strip_micron(text),
         owner=remote_identity.hexhash,
         address=address,
-        nodeName=None
+        nodeName=None,
     )
 
     if get_name_by_address:
@@ -113,22 +113,31 @@ def extract(
         "Extracted %s internal, %s external links from %s",
         len(internal_links),
         len(external_links),
-        doc.url
+        doc.url,
     )
     return internal_links + external_links
 
 
-def crawl(get_node_by_address: Callable[[str], str], update_citations: Callable[[str, tp.List[str]], None]):
+def crawl(
+    get_node_by_address: Callable[[str], str],
+    update_citations: Callable[[str, tp.List[str]], None],
+):
     logger = logging.getLogger("crawl-scheduler")
-    crawler = Crawler(load, lambda doc: extract(doc, get_node_by_address, update_citations))
+    crawler = Crawler(
+        load, lambda doc: extract(doc, get_node_by_address, update_citations)
+    )
     nodes = store.get("nodes")
     if not nodes:
         logger.warning("No known nodes to crawl")
         return
     logger.info("starting crawl")
     filtered_nodes = [
-        n for n in nodes.values() if
-        (now() - datetime.datetime.fromtimestamp(n["time"], tz=datetime.timezone.utc)) < datetime.timedelta(days=1)
+        n
+        for n in nodes.values()
+        if (
+            now() - datetime.datetime.fromtimestamp(n["time"], tz=datetime.timezone.utc)
+        )
+        < datetime.timedelta(days=1)
     ]
     # random.shuffle(filtered_nodes)
     for node in sorted(filtered_nodes, key=lambda n: n["time"], reverse=True):

@@ -40,9 +40,9 @@ class JsonFileStore(AbstractStore):
         self.__save(self._data)
 
     def __save(self, data):
-        with open(self._path, 'w') as f:
+        with open(self._path, "w") as f:
             json.dump(data, f)
 
     def __load(self) -> dict:
-        with open(self._path, 'r') as f:
+        with open(self._path, "r") as f:
             return json.load(f)

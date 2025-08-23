@@ -8,7 +8,7 @@ def datetime_format(value, format=CONFIG.TIME_FORMAT):
     return value.strftime(format)
 
 
-RE_MALFORM = re.compile(r'[\u0000-\u001F\u007F-\u009F\uFFFD]+')
+RE_MALFORM = re.compile(r"[\u0000-\u001F\u007F-\u009F\uFFFD]+")
 
 
 def replace_malformed(text: str) -> str:

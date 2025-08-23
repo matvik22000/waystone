@@ -14,7 +14,6 @@ APP_NAME = "nomadnetwork"
 
 
 class _AsyncWrapper:
-
     def __init__(self):
         self.res = None
         self._completed = False
@@ -42,10 +41,7 @@ class RequestError(Exception):
 
 async def establish_link(dst: RNS.Destination):
     link = _AsyncWrapper()
-    RNS.Link(
-        dst,
-        established_callback=link.on_success
-    )
+    RNS.Link(dst, established_callback=link.on_success)
     return await link.get()
 
 
@@ -62,12 +58,14 @@ async def async_request(url: str, data: dict | None = None) -> RNS.RequestReceip
         data=data,
         # progress_callback=lambda r: logger.debug("in progress: %s", r),
         response_callback=res.on_success,
-        failed_callback=fail
+        failed_callback=fail,
     )
     return await res.get()
 
 
-def request(url: str, data: dict | None = None, timeout: int = 20) -> RNS.RequestReceipt:
+def request(
+    url: str, data: dict | None = None, timeout: int = 20
+) -> RNS.RequestReceipt:
     loop = asyncio.new_event_loop()
     return loop.run_until_complete(asyncio.wait_for(async_request(url, data), timeout))
 
@@ -87,17 +85,15 @@ async def parse_url(url: str) -> tp.Tuple[RNS.Destination, str]:
 async def get_dest(destination_hexhash: str) -> RNS.Destination:
     destination_hash = bytes.fromhex(destination_hexhash)
     if not RNS.Transport.has_path(destination_hash):
-        RNS.log("Destination is not yet known. Requesting path and waiting for announce to arrive...")
+        RNS.log(
+            "Destination is not yet known. Requesting path and waiting for announce to arrive..."
+        )
         RNS.Transport.request_path(destination_hash)
         while not RNS.Transport.has_path(destination_hash):
             await asyncio.sleep(0.1)
 
     server_identity = RNS.Identity.recall(destination_hash)
     server_destination = RNS.Destination(
-        server_identity,
-        RNS.Destination.OUT,
-        RNS.Destination.SINGLE,
-        APP_NAME,
-        "node"
+        server_identity, RNS.Destination.OUT, RNS.Destination.SINGLE, APP_NAME, "node"
     )
     return server_destination

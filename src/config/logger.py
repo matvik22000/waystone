@@ -12,7 +12,7 @@ class RNSLogHandler(logging.StreamHandler):
         logging.INFO: RNS.LOG_INFO,
         logging.WARNING: RNS.LOG_WARNING,
         logging.ERROR: RNS.LOG_ERROR,
-        logging.CRITICAL: RNS.LOG_CRITICAL
+        logging.CRITICAL: RNS.LOG_CRITICAL,
     }
 
     def emit(self, record: LogRecord) -> None:
@@ -36,24 +36,20 @@ def config_logger(level: int, log_file_path: str):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     # Общий формат
-    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+    )
 
     # Основной лог — всё кроме crawler-*
     main_handler = logging.handlers.RotatingFileHandler(
-        log_file_path,
-        maxBytes=1024 * 1024,
-        backupCount=3,
-        encoding="utf-8"
+        log_file_path, maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     main_handler.setFormatter(formatter)
     main_handler.addFilter(NotCrawlerFilter())  # 👈 фильтр "всё кроме crawler-*"
 
     # Лог только для crawler-*
     crawler_handler = logging.handlers.RotatingFileHandler(
-        "crawler.log",
-        maxBytes=1024 * 1024,
-        backupCount=3,
-        encoding="utf-8"
+        "crawler.log", maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     crawler_handler.setFormatter(formatter)
     crawler_handler.addFilter(CrawlerFilter())  # 👈 фильтр "только crawler-*"
@@ -69,5 +65,5 @@ def config_logger(level: int, log_file_path: str):
             main_handler,
             crawler_handler,
             console_handler,
-        ]
+        ],
     )

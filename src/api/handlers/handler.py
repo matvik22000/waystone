@@ -7,22 +7,14 @@ from src.api.exceptions import BadRequest, BadHandlerSignature, NotIdentified
 from .request import Request
 from .response import AbstractResponse, StrResponse
 
-handle_func_signature = tp.Callable[[
-    tp.Optional[Request],
-    tp.Any
-], AbstractResponse | str | None]
+handle_func_signature = tp.Callable[
+    [tp.Optional[Request], tp.Any], AbstractResponse | str | None
+]
 
 # Just like WSGI, but for NomadNet
 NSGI = tp.Callable[
-    [
-        str,
-        tp.Optional[tp.Any],
-        bytes,
-        bytes,
-        tp.Optional[bytes],
-        float
-    ],
-    tp.Optional[bytes]
+    [str, tp.Optional[tp.Any], bytes, bytes, tp.Optional[bytes], float],
+    tp.Optional[bytes],
 ]
 
 
@@ -32,7 +24,9 @@ class Handler:
     _forward_raw_request: bool
     _identifying_required: bool
 
-    def __init__(self, path: str, handle: handle_func_signature, identifying_required=False):
+    def __init__(
+        self, path: str, handle: handle_func_signature, identifying_required=False
+    ):
         self._forward_raw_request = False
         self._request_params = []
 
@@ -43,14 +37,17 @@ class Handler:
         self._logger = logging.getLogger(path)
 
     def _parse_signature(self, handle: tp.Callable):
-        if not callable(handle): raise TypeError("Handle object must be callable")
+        if not callable(handle):
+            raise TypeError("Handle object must be callable")
         first = True
         sig = inspect.signature(handle)
         for p_name, p_value in sig.parameters.items():
             p_type = p_value.annotation
             if p_type == Request:
                 if not first:
-                    raise BadHandlerSignature("'Request' argument must be first or omitted")
+                    raise BadHandlerSignature(
+                        "'Request' argument must be first or omitted"
+                    )
                 self._forward_raw_request = True
                 continue
             self._request_params.append(p_value)
@@ -77,7 +74,9 @@ class Handler:
                 parsed = p_type(r.get_param(p_name))
                 params.append(parsed)
             except Exception as e:
-                self._logger.debug("Exception during %s conversion to %s: %s", p_name, p_type, e)
+                self._logger.debug(
+                    "Exception during %s conversion to %s: %s", p_name, p_type, e
+                )
                 mistyped_params.append((p_name, p_type))
         if mistyped_params or omitted_params:
             raise BadRequest(omitted_params, mistyped_params)
@@ -92,12 +91,13 @@ class Handler:
         return bytes(AbstractResponse.parse(res))
 
     def __call__(
-            self, path: str,
-            data: tp.Optional[tp.Any],
-            request_id: bytes,
-            link_id: bytes,
-            remote_identity: tp.Optional[bytes],
-            requested_at: float
+        self,
+        path: str,
+        data: tp.Optional[tp.Any],
+        request_id: bytes,
+        link_id: bytes,
+        remote_identity: tp.Optional[bytes],
+        requested_at: float,
     ) -> tp.Optional[bytes]:
         self._logger.info("Processing request to %s", path)
         r = Request(path, data, request_id, link_id, remote_identity, requested_at)

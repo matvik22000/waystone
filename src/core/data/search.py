@@ -18,6 +18,7 @@ from .citations import Citations, citations
 @dataclass
 class SearchDocument:
     """Документ для индексации в поисковой системе"""
+
     url: str
     text: str
     owner: str
@@ -29,7 +30,7 @@ class SearchDocument:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'SearchDocument':
+    def from_dict(cls, data: Dict) -> "SearchDocument":
         """Создает документ из словаря"""
         return cls(**data)
 
@@ -37,6 +38,7 @@ class SearchDocument:
 @dataclass
 class SearchResult:
     """Результат поиска с подсветкой и релевантностью"""
+
     url: str
     text: str
     owner: str
@@ -57,6 +59,7 @@ class SearchResult:
 @dataclass
 class SearchWeights:
     """Веса для ранжирования результатов поиска"""
+
     text_search: float = 1
     citations: float = 1.5
 
@@ -95,8 +98,10 @@ class SearchEngine:
             for doc in docs:
                 doc_dict = doc.to_dict()
                 # Фильтруем только поля, которые есть в схеме
-                filtered_dict = {k: v for k, v in doc_dict.items() if k in self.schema.stored_names()}
-                filtered_dict['raw'] = doc.text
+                filtered_dict = {
+                    k: v for k, v in doc_dict.items() if k in self.schema.stored_names()
+                }
+                filtered_dict["raw"] = doc.text
                 writer.update_document(**filtered_dict)
             writer.commit(optimize=True)
 
@@ -104,7 +109,9 @@ class SearchEngine:
         """Возвращает количество документов в индексе"""
         return self.ix.doc_count_all()
 
-    def query(self, q: str, highlight: bool = True, max_results=20) -> List[SearchResult]:
+    def query(
+        self, q: str, highlight: bool = True, max_results=20
+    ) -> List[SearchResult]:
         """Выполняет поиск по запросу"""
         fields = ["url", "text", "nodeName", "owner", "address"]
         search_results = []
@@ -112,11 +119,9 @@ class SearchEngine:
         with self.ix.searcher() as searcher:
             results = searcher.search(
                 MultifieldParser(
-                    fields,
-                    schema=self.schema,
-                    group=OrGroup.factory(1.5)
+                    fields, schema=self.schema, group=OrGroup.factory(1.5)
                 ).parse(q),
-                limit=max_results * 2
+                limit=max_results * 2,
             )
             results.formatter = MuBoldFormatter()
             results.fragmenter.maxchars = 100
@@ -129,7 +134,7 @@ class SearchEngine:
                     owner=r["owner"],
                     address=r["address"],
                     name=r.get("nodeName") or r["url"],
-                    score=r.score
+                    score=r.score,
                 )
 
                 # Добавляем подсветку если нужно
@@ -153,8 +158,9 @@ class SearchEngine:
             # Вычисляем новый скор с учетом цитирований
             citation_score = self.citations.get_amount_for(result.address)
             new_score = (
-                    self.weights.text_search * result.score +
-                    self.weights.citations * (math.log(citation_score) if citation_score > 0 else 0)
+                self.weights.text_search * result.score
+                + self.weights.citations
+                * (math.log(citation_score) if citation_score > 0 else 0)
             )
 
             # Создаем новый результат с обновленным скором
@@ -190,7 +196,9 @@ class SearchEngine:
         return filtered_results
 
     @staticmethod
-    def _filter_same_address(results: List[SearchResult], max_same_address=2) -> List[SearchResult]:
+    def _filter_same_address(
+        results: List[SearchResult], max_same_address=2
+    ) -> List[SearchResult]:
         """
         drop extra pages on one address (somtimes result of search is 10 pages on one node. I don't need all ot them)
 
@@ -226,7 +234,7 @@ schema = Schema(
         stored=True,
         analyzer=NgramWordAnalyzer(minsize=4, maxsize=15),
         phrase=False,
-        field_boost=2.0
+        field_boost=2.0,
     ),
 )
 

@@ -16,12 +16,14 @@ from src.core.data.store import find_owner
 from src.core.rns import dst, identity
 from src.core.utils import now
 
-app = NomadAPI(Config(
-    templates_dir=CONFIG.TEMPLATES_DIR,
-    # enable_propagation_node=False,
-    # propagation_node_identity=identity,
-    # propagation_node_config=dict(storagepath=get_path("propagation"))
-))
+app = NomadAPI(
+    Config(
+        templates_dir=CONFIG.TEMPLATES_DIR,
+        # enable_propagation_node=False,
+        # propagation_node_identity=identity,
+        # propagation_node_config=dict(storagepath=get_path("propagation"))
+    )
+)
 TIME_FORMAT = CONFIG.TIME_FORMAT
 logger = logging.getLogger("views")
 
@@ -30,13 +32,16 @@ queries = JsonFileStore(get_path("queries.json"))
 
 @app.request("/page/index.mu")
 def index(r: Request):
-    return render_template("index.mu", dict(
-        pages=search_engine.get_index_size(),
-        nodes=len(store.get("nodes", {})),
-        links=len(dst.links),
-        queries=get_last_10_queries(),
-        now=now().strftime(TIME_FORMAT)
-    ))
+    return render_template(
+        "index.mu",
+        dict(
+            pages=search_engine.get_index_size(),
+            nodes=len(store.get("nodes", {})),
+            links=len(dst.links),
+            queries=get_last_10_queries(),
+            now=now().strftime(TIME_FORMAT),
+        ),
+    )
 
 
 def get_last_10_queries():
@@ -68,7 +73,7 @@ def format_timedelta(td):
     if seconds > 0:
         parts.append(f"{seconds}s")
 
-    return ' '.join(parts)
+    return " ".join(parts)
 
 
 @app.request("/page/nodes.mu")
@@ -94,7 +99,9 @@ def nodes_mu(r: Request, query: str = "", mentions_for: str = ""):
         items = nodes_raw.items()
 
     for dst, n in items:
-        last_online = datetime.datetime.fromtimestamp(n["time"], tz=datetime.timezone.utc)
+        last_online = datetime.datetime.fromtimestamp(
+            n["time"], tz=datetime.timezone.utc
+        )
         nodes = dict(
             dst=format_for_link(dst),
             name=n["name"],
@@ -102,16 +109,23 @@ def nodes_mu(r: Request, query: str = "", mentions_for: str = ""):
             owner=find_owner(n["identity"]) or ("Unknown", "Unknown"),
             citations=citations.get_amount_for(format_for_link(dst)),
             last_online=last_online.strftime(TIME_FORMAT),
-            since_online=format_timedelta(since_online(last_online))
+            since_online=format_timedelta(since_online(last_online)),
         )
         nodes_parsed.append(nodes)
 
-    return render_template("nodes.mu", dict(
-        mentions_for=mentions_for_name,
-        query=query or "",
-        now=now().strftime(TIME_FORMAT),
-        nodes=sorted(nodes_parsed, key=lambda p: (p["citations"], p["last_online"]), reverse=True)
-    ))
+    return render_template(
+        "nodes.mu",
+        dict(
+            mentions_for=mentions_for_name,
+            query=query or "",
+            now=now().strftime(TIME_FORMAT),
+            nodes=sorted(
+                nodes_parsed,
+                key=lambda p: (p["citations"], p["last_online"]),
+                reverse=True,
+            ),
+        ),
+    )
 
 
 @app.request("/page/peers.mu")
@@ -127,19 +141,24 @@ def peers_mu(r: Request, query: str = ""):
         items = peers_raw.items()
 
     for dst, p in items:
-        last_online = datetime.datetime.fromtimestamp(p["time"], tz=datetime.timezone.utc)
+        last_online = datetime.datetime.fromtimestamp(
+            p["time"], tz=datetime.timezone.utc
+        )
         peer = dict(
             dst=format_for_link(dst),
             name=p["name"],
             last_online=last_online.strftime(TIME_FORMAT),
-            since_online=format_timedelta(since_online(last_online))
+            since_online=format_timedelta(since_online(last_online)),
         )
         peers_parsed.append(peer)
-    return render_template("peers.mu", dict(
-        query=query or "",
-        now=now().strftime(TIME_FORMAT),
-        peers=sorted(peers_parsed, key=lambda p: p["last_online"], reverse=True)
-    ))
+    return render_template(
+        "peers.mu",
+        dict(
+            query=query or "",
+            now=now().strftime(TIME_FORMAT),
+            peers=sorted(peers_parsed, key=lambda p: p["last_online"], reverse=True),
+        ),
+    )
 
 
 _re = re.compile("\s+")
@@ -163,7 +182,9 @@ def format_text(text: str) -> str:
 
 @app.request("/page/search.mu")
 def search(r: Request, query: str):
-    queries.set("queries", queries.get("queries", []) + [replace_line_breaks(query).strip()])
+    queries.set(
+        "queries", queries.get("queries", []) + [replace_line_breaks(query).strip()]
+    )
 
     entries = search_engine.query(query)
     nodes = store.get("nodes")
@@ -181,27 +202,39 @@ def search(r: Request, query: str):
         r.save_user_data(hist)
     except NotIdentified:
         pass
-    return render_template("search.mu",
-                           dict(
-                               entries=[e.to_dict() for e in entries],
-                               total=len(entries),
-                               query=replace_line_breaks(query).strip()
-                           ))
+    return render_template(
+        "search.mu",
+        dict(
+            entries=[e.to_dict() for e in entries],
+            total=len(entries),
+            query=replace_line_breaks(query).strip(),
+        ),
+    )
 
 
 @app.request("/page/history.mu", identifying_required=True)
 def history(r: Request, page: int = 0):
     hist = list(reversed(r.get_user_data([])))
     page_size = 20
-    hist_cut = hist[page * page_size:(page + 1) * page_size]
-    return render_template("history.mu", dict(
-        history=[dict(q=v["q"], time=datetime.datetime.fromtimestamp(v["time"], tz=datetime.timezone.utc)) for v in
-                 hist_cut],
-        total=len(hist_cut),
-        page=page,
-        has_next=(page + 1) * page_size < len(hist),
-        has_prev=page != 0
-    ))
+    hist_cut = hist[page * page_size : (page + 1) * page_size]
+    return render_template(
+        "history.mu",
+        dict(
+            history=[
+                dict(
+                    q=v["q"],
+                    time=datetime.datetime.fromtimestamp(
+                        v["time"], tz=datetime.timezone.utc
+                    ),
+                )
+                for v in hist_cut
+            ],
+            total=len(hist_cut),
+            page=page,
+            has_next=(page + 1) * page_size < len(hist),
+            has_prev=page != 0,
+        ),
+    )
 
 
 @app.exception(NotIdentified)

@@ -41,7 +41,9 @@ class _Downloader(Thread):
     _load: Loader
     _extract: Extractor
 
-    def __init__(self, queue: Queue, name: str, _set: _Set, load: Loader, extract: Extractor):
+    def __init__(
+        self, queue: Queue, name: str, _set: _Set, load: Loader, extract: Extractor
+    ):
         super().__init__()
         self._queue = queue
         self._load = load
@@ -64,7 +66,9 @@ class _Downloader(Thread):
                 except Empty:
                     pass
                 except Exception as e:
-                    self._logger.warning("Error in thread %s: %s", self.name, e, exc_info=True)
+                    self._logger.warning(
+                        "Error in thread %s: %s", self.name, e, exc_info=True
+                    )
         finally:
             self._logger.debug("Stopped %s", self.name)
 
@@ -150,10 +154,13 @@ class Crawler:
             return self.total_crawled()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+
     def load(url):
         sleep(1)
-        return "addr", """"
+        return (
+            "addr",
+            """"
 `Faaa`B333
 
 Here is a link without any label: `[:/page/index.mu]
@@ -169,18 +176,17 @@ If you want to include pre-set variables, you can do it like this:
 `[Query the System`:/page/fields.mu`username|auth_token|action=view|amount=64]
 `=
 ``
-"""
-
+""",
+        )
 
     def extract(a):
         internal, external = extract_links(*a)
         return internal + external
 
-
     logging.basicConfig(
         level=logging.DEBUG,
-        format='%(asctime)s %(levelname)s %(module)s %(message)s',
-        handlers=[logging.StreamHandler()]
+        format="%(asctime)s %(levelname)s %(module)s %(message)s",
+        handlers=[logging.StreamHandler()],
     )
 
     crawler = Crawler(load, extract)
