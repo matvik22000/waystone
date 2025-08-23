@@ -1,9 +1,9 @@
 .idea
 app.log
 store.json
-.env\
 .nomadnetwork
 .reticulum
+storage
 
 icmp_tunnel.py
 rmap.txt
