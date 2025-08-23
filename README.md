@@ -2,9 +2,9 @@
 
 **Waystone** is a distributed search engine designed to operate within the Reticulum mesh network. It crawls and indexes content from Nomad Network nodes, providing search capabilities across the decentralized network.
 
-### Backlog
+### NomadAPI
 
-- Separate NomadAPI (flask-like interface to RNS) to a separate python library
+NomadAPI is a flask-like interface to RNS. Eventually it will be separated into a standalone python library. You can see usage examples in "examples" folder.
 
 ## Architecture Overview
 
