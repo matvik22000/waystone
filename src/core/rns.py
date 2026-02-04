@@ -6,7 +6,7 @@ import RNS
 
 from src.api import create_rns_dest
 from src.config import CONFIG
-from src.core.data import store
+from src.core.data.store import upsert_node, upsert_peer
 from src.core.utils import now
 import RNS.vendor.umsgpack as msgpack
 
@@ -29,21 +29,16 @@ class AnnounceHandler:
             destination,
             app_data,
         )
-        peers: dict = store[self.key]
-        if not peers:
-            peers = {}
-
         if app_data.startswith(b"\x92\xc4\x0e") and app_data.endswith(b"\xc0"):
             name = app_data[3:-1].decode("utf-8")  # Вырезаем известные байты
         else:
             name = app_data.decode("utf-8", errors="replace")  # Фолбэк с заменой ошибок
-        peers[destination] = dict(
-            dst=destination.replace("<", "").replace(">", ""),
-            identity=f"{announced_identity.hexhash}",
-            name=name,
-            time=now().timestamp(),
-        )
-        store[self.key] = peers
+        dst_clean = destination.replace("<", "").replace(">", "")
+        ts = now().timestamp()
+        if self.key == "nodes":
+            upsert_node(destination, dst_clean, f"{announced_identity.hexhash}", name, ts)
+        else:
+            upsert_peer(destination, dst_clean, f"{announced_identity.hexhash}", name, ts)
 
 
 RNS.Transport.register_announce_handler(AnnounceHandler("lxmf.delivery", "peers"))

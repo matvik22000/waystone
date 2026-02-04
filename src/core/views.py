@@ -8,10 +8,9 @@ from src.api import NomadAPI
 from src.api.app import Config
 from src.api.exceptions import NotIdentified, BadRequest
 from src.api.handlers import Request, render_template
-from src.api.store import JsonFileStore
 from src.config import CONFIG
-from src.core.data import search_engine, get_path
-from src.core.data import store
+from src.core.data import search_engine, store
+from src.core.data.queries import add_search_query, get_last_search_queries
 from src.core.data.store import find_owner
 from src.core.rns import dst, identity
 from src.core.utils import now
@@ -26,9 +25,6 @@ app = NomadAPI(
 )
 TIME_FORMAT = CONFIG.TIME_FORMAT
 logger = logging.getLogger("views")
-
-queries = JsonFileStore(get_path("queries.json"))
-
 
 @app.request("/page/index.mu")
 def index(r: Request):
@@ -45,7 +41,7 @@ def index(r: Request):
 
 
 def get_last_10_queries():
-    raw_queries = queries.get("queries", [])
+    raw_queries = get_last_search_queries()
     unique_queries = list(OrderedDict.fromkeys(reversed(raw_queries)))
     return unique_queries[:10]
 
@@ -182,9 +178,7 @@ def format_text(text: str) -> str:
 
 @app.request("/page/search.mu")
 def search(r: Request, query: str):
-    queries.set(
-        "queries", queries.get("queries", []) + [replace_line_breaks(query).strip()]
-    )
+    add_search_query(replace_line_breaks(query).strip())
 
     entries = search_engine.query(query)
     nodes = store.get("nodes")

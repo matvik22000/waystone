@@ -1,40 +1,52 @@
+import time
 from typing import List
 
-from src.api.store import JsonFileStore
+from sqlalchemy import select
+
 from src.core.crawler.rns_request import address_from_url
-from src.core.data import get_path
+from src.core.data.db import get_session
+from src.core.data.models import Citation
+
+
+def _now() -> float:
+    return time.time()
 
 
 class Citations:
-    def __init__(self):
-        self.citations = JsonFileStore(get_path("citations.json"))
-
     def update_citations(self, src: str, links_to: List[str]) -> None:
         if len(links_to) == 0:
             return
-        # select distinct addresses from urls list
         addresses_to = set(map(address_from_url, links_to))
-        # graph of citations, may be used later for visualization
-        # citations dict used for search
-        for_search = self.citations.get("for_search", {})
-
         src_address = address_from_url(src)
+        now_ = _now()
 
-        for target_address in addresses_to:
-            # don't index self citations
-            if target_address == src_address:
-                continue
-            # skip corrupted addresses
-            if len(target_address) != 32:
-                continue
-            current_citations = set(for_search.get(target_address, []))
-            current_citations.add(src_address)
-            for_search[target_address] = list(current_citations)
-
-        self.citations["for_search"] = for_search
+        with get_session() as session:
+            for target_address in addresses_to:
+                if target_address == src_address:
+                    continue
+                if len(target_address) != 32:
+                    continue
+                existing = session.execute(
+                    select(Citation).where(
+                        Citation.target_address == target_address,
+                        Citation.src_address == src_address,
+                    )
+                ).scalars().first()
+                if existing is None:
+                    session.add(
+                        Citation(
+                            target_address=target_address,
+                            src_address=src_address,
+                            created_at=now_,
+                        )
+                    )
 
     def get_citations_for(self, address: str) -> set[str]:
-        return self.citations.get("for_search", {}).get(address, set())
+        with get_session() as session:
+            rows = session.execute(
+                select(Citation.src_address).where(Citation.target_address == address)
+            ).scalars().all()
+            return set(rows) if rows else set()
 
     def get_amount_for(self, address: str) -> int:
         return len(self.get_citations_for(address))

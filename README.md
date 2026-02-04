@@ -51,6 +51,7 @@ NomadAPI is a flask-like interface to RNS. Eventually it will be separated into 
 - **LXMF**: Nomad Network messaging
 - **Whoosh**: Full-text search indexing
 - **Jinja2**: Template engine
+- **SQLAlchemy**: SQLite storage (nodes, peers, citations, queries, user history)
 - **PySerial**: Hardware interface support
 
 ### File Structure
@@ -110,7 +111,9 @@ The application uses environment-based configuration through the `Config` class 
 
 Persistent data is stored in the `storage/` directory:
 - `search_index/`: Whoosh search index files
-- `announces.json`: Network announce data
-- `citations.json`: Inter-node citation graph
-- `queries.json`: Search query history
-- `api_user_data.json`: User session data
+- `nomadapi.db`: SQLite database (nodes, peers, citations, search_queries, user_search_history)
+
+To migrate existing JSON data into SQLite once, run (with env set):
+```bash
+python -m src.core.data.migrate_json_to_sqlite
+```

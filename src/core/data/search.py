@@ -75,6 +75,7 @@ class MuBoldFormatter(Formatter):
 class SearchEngine:
     """Поисковая система с поддержкой индексации и поиска документов"""
 
+
     def __init__(self, schema: Schema, citations: Citations):
         self.__lock = Lock()
         self.schema = schema
