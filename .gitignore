@@ -8,3 +8,6 @@ storage
 icmp_tunnel.py
 rmap.txt
 meshchat_interfaces.txt
+__pycache__/
+*.py[cod]
+*.log
