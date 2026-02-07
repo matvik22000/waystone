@@ -42,7 +42,7 @@ def main():
         )
         or dst.announce(CONFIG.ANNOUNCE_NAME.encode("utf-8"))
     )
-    app.scheduler.every(5).minutes.do(start_crawling_in_thread)
+    app.scheduler.every(1).hours.do(start_crawling_in_thread)
 
     register_filters()
 
