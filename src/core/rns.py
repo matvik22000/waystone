@@ -20,8 +20,10 @@ class AnnounceHandler:
         self.key = key
 
     def received_announce(
-        self, destination_hash, announced_identity: RNS.Identity, app_data
+            self, destination_hash, announced_identity: RNS.Identity, app_data
     ):
+        if not app_data:
+            return  # don't save announces without name
         destination = RNS.prettyhexrep(destination_hash)
         logging.getLogger(self.aspect_filter).debug(
             "received announce ident: %s, dst: %s, data: %s",

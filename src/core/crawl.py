@@ -1,7 +1,5 @@
 import asyncio
-import datetime
 import logging
-import random
 import re
 from dataclasses import dataclass
 import typing as tp
@@ -11,15 +9,13 @@ import RNS
 
 from src.config import CONFIG
 from src.core.data.search import SearchDocument
-from src.core.utils import now
 from src.core.crawler.crawler import Crawler
 from src.core.crawler.parser import extract_links
 from src.core.crawler.rns_request import address_from_url, request
-from src.core.data import store, search_engine
+from src.core.data import search_engine
+from src.core.data.store import get_recent_nodes_for_crawl
 
 logger = logging.getLogger("crawler")
-
-import re
 
 # Компилируем регулярки один раз
 _RE_FB = re.compile(r"`[fb]")
@@ -55,14 +51,20 @@ def strip_micron(text: str) -> str:
 @dataclass
 class Document:
     url: str
-    response: RNS.RequestReceipt
+    response: RNS.RequestReceipt | None
 
-    def get_text(self) -> str | None:
+    def get_info(self) -> tuple[RNS.Link | None, str | None]:
+        if self.response is None:
+            return None, None
+        response = self.response
+        # Explicitly release receipt reference to reduce retained memory.
+        self.response = None
         try:
-            return self.response.response.decode("utf-8")
-        except Exception as e:
+            text = response.response.decode("utf-8")
+        except Exception:
             logging.debug("Empty document")
-            return None
+            text = None
+        return response.link, text
 
 
 def load(url: str) -> Document | None:
@@ -84,12 +86,11 @@ def extract(
 ) -> tp.List[str]:
     if not doc:
         return []
-    link: RNS.Link = doc.response.link
+    link, text = doc.get_info()
+    if not link or not text:
+        return []
     remote_identity: RNS.Identity = link.get_remote_identity()
     address = address_from_url(doc.url)
-    text = doc.get_text()
-    if not text:
-        return []
     index_entry = SearchDocument(
         url=doc.url,
         text=strip_micron(text),
@@ -103,7 +104,7 @@ def extract(
         if nodeName:
             index_entry.nodeName = nodeName
 
-    search_engine.index_documents([index_entry])
+    search_engine.queue_document(index_entry)
     internal_links, external_links = extract_links(address, text)
 
     if update_citations:
@@ -124,25 +125,20 @@ def crawl(
 ):
     logger = logging.getLogger("crawl-scheduler")
     crawler = Crawler(
-        load, lambda doc: extract(doc, get_node_by_address, update_citations)
+        load,
+        lambda doc: extract(doc, get_node_by_address, update_citations),
+        queue_maxsize=CONFIG.CRAWLER_QUEUE_MAXSIZE,
+        visited_cache_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS,
     )
-    nodes = store.get("nodes")
-    if not nodes:
+    recent_nodes = get_recent_nodes_for_crawl(within_seconds=86400)
+    if not recent_nodes:
         logger.warning("No known nodes to crawl")
         return
     logger.info("starting crawl")
-    filtered_nodes = [
-        n
-        for n in nodes.values()
-        if (
-            now() - datetime.datetime.fromtimestamp(n["time"], tz=datetime.timezone.utc)
-        )
-        < datetime.timedelta(days=1)
-    ]
-    # random.shuffle(filtered_nodes)
-    for node in sorted(filtered_nodes, key=lambda n: n["time"], reverse=True):
-        dst = node["dst"]
+    for dst in recent_nodes:
         crawler.add_url(dst + ":/page/index.mu")
-    logger.info("enqueued %s urls", len(filtered_nodes))
+    logger.info("enqueued %s urls", len(recent_nodes))
     crawler.start(CONFIG.CRAWLER_THREADS)
     crawler.join()
+    # Flush any remaining batched documents after crawl completion.
+    search_engine.flush_index_queue()

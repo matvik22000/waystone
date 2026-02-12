@@ -12,6 +12,8 @@ class __Cfg(Config):
     NODE_IDENTITY_PATH: str = required()
     ANNOUNCE_NAME: str = optional("Waystone")
     CRAWLER_THREADS: int = optional(5)
+    CRAWLER_QUEUE_MAXSIZE: int = optional(5000)
+    CRAWLER_VISITED_CACHE_SECONDS: int = optional(86400)
 
     TEMPLATES_DIR: str = required()
     LOG_PATH: str = optional("app.log")

@@ -3,6 +3,7 @@ from threading import Thread
 from src.config import CONFIG
 from src.core.data.citations import citations
 from src.core.data.store import find_node_by_address
+from src.core.utils import get_process_rss_bytes
 
 
 def main():
@@ -36,12 +37,20 @@ def main():
             daemon=True,
         ).start()
 
+    def log_rss_usage():
+        rss_bytes = get_process_rss_bytes()
+        if rss_bytes is None:
+            return
+        rss_mb = rss_bytes / (1024 * 1024)
+        logging.getLogger("memory").info("Process RSS: %.2f MB", rss_mb)
+
     app.scheduler.every(5).minutes.do(
         lambda: logging.getLogger("announce").debug(
             "announce with data %s", CONFIG.ANNOUNCE_NAME
         )
         or dst.announce(CONFIG.ANNOUNCE_NAME.encode("utf-8"))
     )
+    app.scheduler.every(5).minutes.do(log_rss_usage)
     app.scheduler.every(1).hours.do(start_crawling_in_thread)
 
     register_filters()

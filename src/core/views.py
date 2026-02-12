@@ -1,7 +1,6 @@
 import datetime
 import logging
 import re
-from typing import OrderedDict, Optional
 
 from src.core.data.citations import citations
 from src.api import NomadAPI
@@ -9,9 +8,16 @@ from src.api.app import Config
 from src.api.exceptions import NotIdentified, BadRequest
 from src.api.handlers import Request, render_template
 from src.config import CONFIG
-from src.core.data import search_engine, store
+from src.core.data import search_engine
 from src.core.data.queries import add_search_query, get_last_search_queries
-from src.core.data.store import find_owner
+from src.core.data.store import (
+    count_nodes,
+    find_node_by_address,
+    find_owner,
+    get_nodes_for_addresses,
+    get_nodes_page,
+    get_peers_page,
+)
 from src.core.rns import dst, identity
 from src.core.utils import now
 
@@ -32,7 +38,7 @@ def index(r: Request):
         "index.mu",
         dict(
             pages=search_engine.get_index_size(),
-            nodes=len(store.get("nodes", {})),
+            nodes=count_nodes(),
             links=len(dst.links),
             queries=get_last_10_queries(),
             now=now().strftime(TIME_FORMAT),
@@ -41,9 +47,7 @@ def index(r: Request):
 
 
 def get_last_10_queries():
-    raw_queries = get_last_search_queries()
-    unique_queries = list(OrderedDict.fromkeys(reversed(raw_queries)))
-    return unique_queries[:10]
+    return get_last_search_queries(limit=10)
 
 
 def format_for_link(dst):
@@ -73,8 +77,13 @@ def format_timedelta(td):
 
 
 @app.request("/page/nodes.mu")
-def nodes_mu(r: Request, query: str = "", mentions_for: str = ""):
-    nodes_raw = store.get("nodes", {})
+def nodes_mu(
+    r: Request,
+    query: str = "",
+    mentions_for: str = "",
+    page: int = 0,
+    page_size: int = 10,
+):
     nodes_parsed = []
     items = []
     mentions_for_name = ""
@@ -83,16 +92,19 @@ def nodes_mu(r: Request, query: str = "", mentions_for: str = ""):
         raise Exception("mentioned_at and q mustn't be used together")
     if mentions_for:
         mentioned_at = citations.get_citations_for(mentions_for)
-        mentions_for_name = nodes_raw.get(f"<{mentions_for}>").get("name")
-        for dst, n in nodes_raw.items():
-            if format_for_link(dst) in mentioned_at:
-                items.append((dst, n))
+        mention_node = find_node_by_address(mentions_for)
+        if mention_node:
+            mentions_for_name = mention_node["name"]
+        start = max(0, int(page)) * max(1, int(page_size))
+        end = start + max(1, int(page_size))
+        for n in get_nodes_for_addresses(mentioned_at)[start:end]:
+            items.append((n["destination"], n))
     elif query:
-        for dst, n in nodes_raw.items():
-            if query in n["name"].lower() or query in n["dst"]:
-                items.append((dst, n))
+        for n in get_nodes_page(page=page, page_size=page_size, query=query):
+            items.append((n["destination"], n))
     else:
-        items = nodes_raw.items()
+        for n in get_nodes_page(page=page, page_size=page_size):
+            items.append((n["destination"], n))
 
     for dst, n in items:
         last_online = datetime.datetime.fromtimestamp(
@@ -125,23 +137,14 @@ def nodes_mu(r: Request, query: str = "", mentions_for: str = ""):
 
 
 @app.request("/page/peers.mu")
-def peers_mu(r: Request, query: str = ""):
-    peers_raw = store.get("peers", {})
+def peers_mu(r: Request, query: str = "", page: int = 0, page_size: int = 100):
     peers_parsed = []
-    items = []
-    if query:
-        for dst, p in peers_raw.items():
-            if query in p["name"].lower() or query in p["dst"]:
-                items.append((dst, p))
-    else:
-        items = peers_raw.items()
-
-    for dst, p in items:
+    for p in get_peers_page(page=page, page_size=page_size, query=query):
         last_online = datetime.datetime.fromtimestamp(
             p["time"], tz=datetime.timezone.utc
         )
         peer = dict(
-            dst=format_for_link(dst),
+            dst=format_for_link(p["destination"]),
             name=p["name"],
             last_online=last_online.strftime(TIME_FORMAT),
             since_online=format_timedelta(since_online(last_online)),
@@ -181,10 +184,9 @@ def search(r: Request, query: str):
     add_search_query(replace_line_breaks(query).strip())
 
     entries = search_engine.query(query)
-    nodes = store.get("nodes")
     for e in entries:
         e.text = format_text(e.text)
-        node_info = nodes.get(f"<{e.address}>")
+        node_info = find_node_by_address(e.address)
         if node_info:
             e.name = node_info["name"] + " " + e.url.split(":")[1]
         else:

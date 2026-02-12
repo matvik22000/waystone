@@ -1,7 +1,7 @@
 import time
 import typing as tp
 
-from sqlalchemy import select
+from sqlalchemy import desc, func, select
 
 from src.core.data.db import get_session
 from src.core.data.models import Node, Peer
@@ -9,6 +9,26 @@ from src.core.data.models import Node, Peer
 
 def _now() -> float:
     return time.time()
+
+
+def _node_to_dict(row: Node) -> dict:
+    return {
+        "destination": row.destination,
+        "dst": row.dst,
+        "identity": row.identity,
+        "name": row.name,
+        "time": row.time,
+    }
+
+
+def _peer_to_dict(row: Peer) -> dict:
+    return {
+        "destination": row.destination,
+        "dst": row.dst,
+        "identity": row.identity,
+        "name": row.name,
+        "time": row.time,
+    }
 
 
 def get_nodes() -> dict:
@@ -39,6 +59,68 @@ def get_peers() -> dict:
             }
             for row in rows
         }
+
+
+def get_nodes_page(page: int = 0, page_size: int = 100, query: str = "") -> list[dict]:
+    page = max(0, int(page))
+    page_size = max(1, min(int(page_size), 1000))
+
+    with get_session() as session:
+        q = select(Node).order_by(desc(Node.time))
+        if query:
+            like = f"%{query}%"
+            q = q.where((Node.name.ilike(like)) | (Node.dst.ilike(like)))
+        rows = (
+            session.execute(q.offset(page * page_size).limit(page_size))
+            .scalars()
+            .all()
+        )
+        return [_node_to_dict(r) for r in rows]
+
+
+def get_peers_page(page: int = 0, page_size: int = 100, query: str = "") -> list[dict]:
+    page = max(0, int(page))
+    page_size = max(1, min(int(page_size), 1000))
+
+    with get_session() as session:
+        q = select(Peer).order_by(desc(Peer.time))
+        if query:
+            like = f"%{query}%"
+            q = q.where((Peer.name.ilike(like)) | (Peer.dst.ilike(like)))
+        rows = (
+            session.execute(q.offset(page * page_size).limit(page_size))
+            .scalars()
+            .all()
+        )
+        return [_peer_to_dict(r) for r in rows]
+
+
+def get_nodes_for_addresses(addresses: tp.Iterable[str]) -> list[dict]:
+    addresses = list(addresses)
+    if not addresses:
+        return []
+    with get_session() as session:
+        rows = session.execute(select(Node).where(Node.dst.in_(addresses))).scalars().all()
+        return [_node_to_dict(r) for r in rows]
+
+
+def get_recent_nodes_for_crawl(within_seconds: int = 86400) -> list[str]:
+    min_ts = _now() - max(1, within_seconds)
+    with get_session() as session:
+        rows = session.execute(
+            select(Node.dst).where(Node.time >= min_ts).order_by(desc(Node.time))
+        ).scalars().all()
+        return list(rows)
+
+
+def count_nodes() -> int:
+    with get_session() as session:
+        return int(session.execute(select(func.count(Node.id))).scalar_one())
+
+
+def count_peers() -> int:
+    with get_session() as session:
+        return int(session.execute(select(func.count(Peer.id))).scalar_one())
 
 
 def upsert_node(destination: str, dst: str, identity: str, name: str, ts: float) -> None:
@@ -102,12 +184,7 @@ def find_node_by_address(address: str) -> tp.Optional[dict]:
         row = session.execute(select(Node).where(Node.dst == address)).scalars().first()
         if row is None:
             return None
-        return {
-            "dst": row.dst,
-            "identity": row.identity,
-            "name": row.name,
-            "time": row.time,
-        }
+        return _node_to_dict(row)
 
 
 # Backward compatibility: store.get("nodes", {}) and store.get("peers", {})

@@ -1,5 +1,4 @@
 from sqlalchemy import (
-    DateTime,
     Float,
     Index,
     String,
@@ -7,7 +6,6 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from typing import Optional
 
 
 class Base(DeclarativeBase):
@@ -87,4 +85,18 @@ class UserSearchHistory(Base):
     __table_args__ = (
         Index("idx_user_search_history_identity", "remote_identity"),
         Index("idx_user_search_history_time", "remote_identity", "time"),
+    )
+
+
+class CrawlVisitedUrl(Base):
+    __tablename__ = "crawl_visited_urls"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    url: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    last_visited_at: Mapped[float] = mapped_column(Float, nullable=False)
+
+    __table_args__ = (
+        Index("idx_crawl_visited_url", "url"),
+        Index("idx_crawl_visited_at", "last_visited_at"),
     )

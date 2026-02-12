@@ -1,54 +1,69 @@
 import datetime
-import itertools
 import logging
 import random
 import threading
 import time
 import typing as tp
 from contextlib import contextmanager
-from datetime import time
-from queue import Queue, Empty
+from queue import Empty, Queue
 from threading import Thread
 from time import sleep
 
-from src.core.crawler.parser import extract_links
+from sqlalchemy import select
+
+from src.core.data.db import get_session
+from src.core.data.models import CrawlVisitedUrl
 
 Document = tp.TypeVar("Document")
 Loader = tp.Callable[[str], Document]
 Extractor = tp.Callable[[Document], tp.List[str]]
 
 
-class _Set:
-    def __init__(self):
+class _DbVisitedSet:
+    def __init__(self, cache_seconds: int):
         self.__lock = threading.Lock()
-        self.__set = set()
+        self.__logger = logging.getLogger("crawler-visited")
+        self._cache_seconds = max(1, int(cache_seconds))
 
-    def add(self, obj):
+    def add_if_missing(self, url: str) -> bool:
         with self.__lock:
-            self.__set.add(obj)
+            with get_session() as session:
+                now_ts = time.time()
+                existing = session.execute(
+                    select(CrawlVisitedUrl).where(CrawlVisitedUrl.url == url)
+                ).scalars().first()
+                if existing is None:
+                    session.add(
+                        CrawlVisitedUrl(
+                            url=url,
+                            created_at=now_ts,
+                            last_visited_at=now_ts,
+                        )
+                    )
+                    return True
 
-    def contains(self, obj):
-        with self.__lock:
-            return obj in self.__set
+                last_ts = existing.last_visited_at or existing.created_at
+                existing.last_visited_at = now_ts
+                if now_ts - last_ts < self._cache_seconds:
+                    return False
+                return True
 
 
 class _Downloader(Thread):
     downloading: bool = False
     _queue: Queue
     _alive: bool = True
-    _set: _Set
+    _crawler: "Crawler"
 
     _load: Loader
     _extract: Extractor
 
-    def __init__(
-        self, queue: Queue, name: str, _set: _Set, load: Loader, extract: Extractor
-    ):
+    def __init__(self, queue: Queue, name: str, crawler: "Crawler", load: Loader, extract: Extractor):
         super().__init__()
         self._queue = queue
         self._load = load
         self._extract = extract
-        self._set = _set
+        self._crawler = crawler
         self._logger = logging.getLogger(f"crawler-{name}")
         self.counter = 0
 
@@ -82,11 +97,8 @@ class _Downloader(Thread):
         self._logger.debug("Extracting %s", url)
         urls = self._extract(document)
 
-        for url in urls:
-            if self._set.contains(url):
-                continue
-            self._set.add(url)
-            self._queue.put(url)
+        for next_url in urls:
+            self._crawler.enqueue_url(next_url, source_url=url)
 
     def stop(self):
         self._alive = False
@@ -102,27 +114,50 @@ class Crawler:
     _load: Loader
     _extract: Extractor
 
-    _queue: Queue = Queue()
     _threads: tp.List[_Downloader]
-    _logger = logging.getLogger("crawler")
-    __started_at: datetime.datetime
-    _set = _Set()
 
-    def __init__(self, load: Loader, page_processor: Extractor):
+    def __init__(
+        self,
+        load: Loader,
+        page_processor: Extractor,
+        queue_maxsize: int = 5000,
+        visited_cache_seconds: int = 86400,
+    ):
         self._load = load
         self._extract = page_processor
+        self._logger = logging.getLogger("crawler")
+        self._queue = Queue(maxsize=queue_maxsize)
+        self._threads = []
+        self.__started_at = datetime.datetime.now()
+        self._visited = _DbVisitedSet(cache_seconds=visited_cache_seconds)
+        self._enqueue_lock = threading.Lock()
 
     def start(self, threads=5):
         self._threads = []
         for i in range(threads):
-            t = _Downloader(self._queue, str(i), self._set, self._load, self._extract)
+            t = _Downloader(self._queue, str(i), self, self._load, self._extract)
             t.start()
             self._threads.append(t)
         self._logger.debug("started with %s downloader threads", threads)
         self.__started_at = datetime.datetime.now()
 
     def add_url(self, url: str):
-        self._queue.put(url)
+        self.enqueue_url(url, source_url="seed")
+
+    def enqueue_url(self, url: str, source_url: str = "") -> bool:
+        with self._enqueue_lock:
+            if self._queue.full():
+                self._logger.warning(
+                    "Queue is full (%s). Ignoring page %s discovered from %s",
+                    self._queue.maxsize,
+                    url,
+                    source_url or "unknown",
+                )
+                return False
+            if not self._visited.add_if_missing(url):
+                return False
+            self._queue.put_nowait(url)
+            return True
 
     def finished(self):
         return all((not t.downloading for t in self._threads))
@@ -153,43 +188,3 @@ class Crawler:
         finally:
             return self.total_crawled()
 
-
-if __name__ == "__main__":
-
-    def load(url):
-        sleep(1)
-        return (
-            "addr",
-            """"
-`Faaa`B333
-
-Here is a link without any label: `[:/page/index.mu]
-
-This is a `[labeled link`72914442a3689add83a09a767963f57c:/page/index.mu] to the same page, but it's hard to see if you don't know it
-
-Here is `F00f`_`[a more visible link`72914442a3689add83a09a767963f57c:/page/index.mu]`_`f
-
-If you want to include pre-set variables, you can do it like this:
-
-`Faaa
-`=
-`[Query the System`:/page/fields.mu`username|auth_token|action=view|amount=64]
-`=
-``
-""",
-        )
-
-    def extract(a):
-        internal, external = extract_links(*a)
-        return internal + external
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)s %(module)s %(message)s",
-        handlers=[logging.StreamHandler()],
-    )
-
-    crawler = Crawler(load, extract)
-    crawler.start(threads=2)
-    crawler.add_url("l1")
-    crawler.join()

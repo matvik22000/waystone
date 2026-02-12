@@ -81,6 +81,10 @@ class SearchEngine:
         self.schema = schema
         self.citations = citations
         self.weights = SearchWeights()
+        self._index_queue: list[SearchDocument] = []
+        self._index_batch_size = 10
+        self._optimize_every_batches = 25
+        self._batches_since_optimize = 0
 
         self.schema.add("raw", STORED())
         storage_path = get_path("search_index")
@@ -95,16 +99,45 @@ class SearchEngine:
     def index_documents(self, docs: Sequence[SearchDocument]):
         """Индексирует документы в поисковой системе"""
         with self.__lock:
-            writer = self.ix.writer()
-            for doc in docs:
-                doc_dict = doc.to_dict()
-                # Фильтруем только поля, которые есть в схеме
-                filtered_dict = {
-                    k: v for k, v in doc_dict.items() if k in self.schema.stored_names()
-                }
-                filtered_dict["raw"] = doc.text
-                writer.update_document(**filtered_dict)
-            writer.commit(optimize=True)
+            self._commit_documents(docs, optimize=False)
+
+    def queue_document(self, doc: SearchDocument):
+        with self.__lock:
+            self._index_queue.append(doc)
+            if len(self._index_queue) >= self._index_batch_size:
+                self._flush_index_queue_locked(force_optimize=False)
+
+    def flush_index_queue(self, force_optimize: bool = False):
+        with self.__lock:
+            self._flush_index_queue_locked(force_optimize=force_optimize)
+
+    def _flush_index_queue_locked(self, force_optimize: bool = False):
+        if not self._index_queue:
+            return
+        docs = self._index_queue
+        self._index_queue = []
+
+        optimize_now = force_optimize or (
+            self._batches_since_optimize + 1 >= self._optimize_every_batches
+        )
+        self._commit_documents(docs, optimize=optimize_now)
+
+        if optimize_now:
+            self._batches_since_optimize = 0
+        else:
+            self._batches_since_optimize += 1
+
+    def _commit_documents(self, docs: Sequence[SearchDocument], optimize: bool):
+        writer = self.ix.writer()
+        for doc in docs:
+            doc_dict = doc.to_dict()
+            # Фильтруем только поля, которые есть в схеме
+            filtered_dict = {
+                k: v for k, v in doc_dict.items() if k in self.schema.stored_names()
+            }
+            filtered_dict["raw"] = doc.text
+            writer.update_document(**filtered_dict)
+        writer.commit(optimize=optimize)
 
     def get_index_size(self) -> int:
         """Возвращает количество документов в индексе"""
@@ -218,6 +251,7 @@ class SearchEngine:
 
     def save(self, path: str):
         """Сохраняет индекс в указанную директорию"""
+        self.flush_index_queue(force_optimize=False)
         if not os.path.exists(path):
             os.makedirs(path)
         self.ix.storage.close()
