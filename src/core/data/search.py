@@ -1,7 +1,10 @@
 import logging
 import math
 import os
+import time
+from collections import OrderedDict
 from dataclasses import dataclass, asdict
+from functools import lru_cache
 from threading import Lock
 from typing import Dict, List, Optional, Sequence
 
@@ -75,9 +78,9 @@ class MuBoldFormatter(Formatter):
 class SearchEngine:
     """Поисковая система с поддержкой индексации и поиска документов"""
 
-
     def __init__(self, schema: Schema, citations: Citations):
         self.__lock = Lock()
+        self.__cache_lock = Lock()
         self.schema = schema
         self.citations = citations
         self.weights = SearchWeights()
@@ -85,6 +88,10 @@ class SearchEngine:
         self._index_batch_size = 10
         self._optimize_every_batches = 25
         self._batches_since_optimize = 0
+        self._query_cache: "OrderedDict[str, tuple[float, list[SearchResult]]]" = OrderedDict()
+
+        self._query_cache_ttl_seconds = 300
+        self._query_cache_max_entries = 200
 
         self.schema.add("raw", STORED())
         storage_path = get_path("search_index")
@@ -118,7 +125,7 @@ class SearchEngine:
         self._index_queue = []
 
         optimize_now = force_optimize or (
-            self._batches_since_optimize + 1 >= self._optimize_every_batches
+                self._batches_since_optimize + 1 >= self._optimize_every_batches
         )
         self._commit_documents(docs, optimize=optimize_now)
 
@@ -144,19 +151,32 @@ class SearchEngine:
         return self.ix.doc_count_all()
 
     def query(
-        self, q: str, highlight: bool = True, max_results: Optional[int] = 20
+            self, q: str, highlight: bool = True, max_results: Optional[int] = 20
     ) -> List[SearchResult]:
         """Выполняет поиск по запросу"""
-        fields = ["url", "text", "nodeName", "owner", "address"]
-        search_results = []
+        cache_key = self._normalize_query_cache_key(q)
+        cached = self._get_cached_results(cache_key)
+        if cached is not None:
+            if max_results is None:
+                return cached
+            return cached[:max_results]
 
+        ranked = self._query_impl(highlight, q)
+
+        self._set_cached_results(cache_key, ranked)
+        return ranked[:max_results]
+
+    def _query_impl(self, highlight, q):
+        fields = ["url", "text", "nodeName", "owner", "address"]
+        search_results: list[SearchResult] = []
         with self.ix.searcher() as searcher:
-            search_limit = None if max_results is None else max(max_results * 2, max_results)
+            # We intentionally fetch full candidate set here and cache the globally ranked
+            # result list, so pagination can reuse it cheaply for a few minutes.
             results = searcher.search(
                 MultifieldParser(
                     fields, schema=self.schema, group=OrGroup.factory(1.5)
                 ).parse(q),
-                limit=search_limit,
+                limit=None,
             )
             results.formatter = MuBoldFormatter()
             results.fragmenter.maxchars = 100
@@ -184,9 +204,7 @@ class SearchEngine:
         search_results = self._filter_duplicates(search_results)
         search_results = self._filter_same_address(search_results)
         ranked = self._rank_results(search_results)
-        if max_results is None:
-            return ranked
-        return ranked[:max_results]
+        return ranked
 
     def _rank_results(self, results: List[SearchResult]) -> List[SearchResult]:
         """Ранжирует результаты с учетом цитирований"""
@@ -196,9 +214,9 @@ class SearchEngine:
             # Вычисляем новый скор с учетом цитирований
             citation_score = self.citations.get_amount_for(result.address)
             new_score = (
-                self.weights.text_search * result.score
-                + self.weights.citations
-                * (math.log(citation_score) if citation_score > 0 else 0)
+                    self.weights.text_search * result.score
+                    + self.weights.citations
+                    * (math.log(citation_score) if citation_score > 0 else 0)
             )
 
             # Создаем новый результат с обновленным скором
@@ -235,7 +253,7 @@ class SearchEngine:
 
     @staticmethod
     def _filter_same_address(
-        results: List[SearchResult], max_same_address=2
+            results: List[SearchResult], max_same_address=2
     ) -> List[SearchResult]:
         """
         drop extra pages on one address (somtimes result of search is 10 pages on one node. I don't need all ot them)
@@ -261,6 +279,37 @@ class SearchEngine:
         self.ix.storage.close()
         self.ix.writer().commit(optimize=True)
         self.ix.storage.copyto(path)
+
+    def _normalize_query_cache_key(self, q: str) -> str:
+        return (q or "").strip()
+
+    def _get_cached_results(self, key: str) -> Optional[List[SearchResult]]:
+        if not key:
+            return None
+        now_ts = time.time()
+        with self.__cache_lock:
+            entry = self._query_cache.get(key)
+            if not entry:
+                return None
+            expires_at, results = entry
+            if expires_at <= now_ts:
+                self._query_cache.pop(key)
+                return None
+            self._query_cache.move_to_end(key)
+            return results.copy()
+
+    def _set_cached_results(self, key: str, results: List[SearchResult]) -> None:
+        if not key:
+            return
+        now_ts = time.time()
+        with self.__cache_lock:
+            self._query_cache[key] = (
+                now_ts + self._query_cache_ttl_seconds,
+                results.copy(),
+            )
+            self._query_cache.move_to_end(key)
+            while len(self._query_cache) > self._query_cache_max_entries:
+                self._query_cache.popitem(last=False)
 
 
 # Схема для индексации

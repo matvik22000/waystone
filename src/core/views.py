@@ -103,7 +103,6 @@ def nodes_mu(
     nodes_parsed = []
     items = []
     mentions_for_name = ""
-    total_items = 0
     page, page_size = normalize_pagination(page, page_size)
 
     if mentions_for and query:
