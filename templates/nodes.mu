@@ -12,3 +12,4 @@ Filter by name:{{ v.input('query', 25, query) }}{{ v.btn('GO!', ':/page/nodes.mu
     Online: `_{{ node.last_online }}`_ ({{ node.since_online }} ago)
     Mentions: `_`[{{ node.citations }}`:/page/nodes.mu`mentions_for={{ node.dst }}]`_
 {% endfor %}
+{% include 'pagination.mu' -%}

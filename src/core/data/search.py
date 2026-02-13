@@ -3,7 +3,7 @@ import math
 import os
 from dataclasses import dataclass, asdict
 from threading import Lock
-from typing import Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from whoosh.analysis import StemmingAnalyzer, NgramWordAnalyzer
 from whoosh.fields import *
@@ -144,18 +144,19 @@ class SearchEngine:
         return self.ix.doc_count_all()
 
     def query(
-        self, q: str, highlight: bool = True, max_results=20
+        self, q: str, highlight: bool = True, max_results: Optional[int] = 20
     ) -> List[SearchResult]:
         """Выполняет поиск по запросу"""
         fields = ["url", "text", "nodeName", "owner", "address"]
         search_results = []
 
         with self.ix.searcher() as searcher:
+            search_limit = None if max_results is None else max(max_results * 2, max_results)
             results = searcher.search(
                 MultifieldParser(
                     fields, schema=self.schema, group=OrGroup.factory(1.5)
                 ).parse(q),
-                limit=max_results * 2,
+                limit=search_limit,
             )
             results.formatter = MuBoldFormatter()
             results.fragmenter.maxchars = 100
@@ -182,7 +183,10 @@ class SearchEngine:
 
         search_results = self._filter_duplicates(search_results)
         search_results = self._filter_same_address(search_results)
-        return self._rank_results(search_results)[:max_results]
+        ranked = self._rank_results(search_results)
+        if max_results is None:
+            return ranked
+        return ranked[:max_results]
 
     def _rank_results(self, results: List[SearchResult]) -> List[SearchResult]:
         """Ранжирует результаты с учетом цитирований"""

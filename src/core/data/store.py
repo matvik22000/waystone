@@ -123,6 +123,24 @@ def count_peers() -> int:
         return int(session.execute(select(func.count(Peer.id))).scalar_one())
 
 
+def count_nodes_filtered(query: str = "") -> int:
+    with get_session() as session:
+        q = select(func.count(Node.id))
+        if query:
+            like = f"%{query}%"
+            q = q.where((Node.name.ilike(like)) | (Node.dst.ilike(like)))
+        return int(session.execute(q).scalar_one())
+
+
+def count_peers_filtered(query: str = "") -> int:
+    with get_session() as session:
+        q = select(func.count(Peer.id))
+        if query:
+            like = f"%{query}%"
+            q = q.where((Peer.name.ilike(like)) | (Peer.dst.ilike(like)))
+        return int(session.execute(q).scalar_one())
+
+
 def upsert_node(destination: str, dst: str, identity: str, name: str, ts: float) -> None:
     with get_session() as session:
         row = session.execute(select(Node).where(Node.destination == destination)).scalars().first()

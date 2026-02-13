@@ -17,6 +17,7 @@ For Query `_'{{ query }}'`_
 `b
 -~
 {% endfor -%}
+{% include 'pagination.mu' %}
 {%- else -%}
 `c`!`_No Pages Found!`_`!
 For Query `_'{{ query }}'`_

@@ -12,3 +12,5 @@ Filter by name:{{ v.input('query', 25, query) }}{{ v.btn('GO!', ':/page/peers.mu
     Online: `_{{ peer.last_online }}`_ ({{ peer.since_online }} ago)
     ``
 {%- endfor %}
+
+{% include 'pagination.mu' %}

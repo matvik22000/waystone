@@ -11,6 +11,8 @@ from src.config import CONFIG
 from src.core.data import search_engine
 from src.core.data.queries import add_search_query, get_last_search_queries
 from src.core.data.store import (
+    count_nodes_filtered,
+    count_peers_filtered,
     count_nodes,
     find_node_by_address,
     find_owner,
@@ -30,6 +32,7 @@ app = NomadAPI(
     )
 )
 TIME_FORMAT = CONFIG.TIME_FORMAT
+DEFAULT_PAGE_SIZE = 20
 logger = logging.getLogger("views")
 
 @app.request("/page/index.mu")
@@ -76,17 +79,32 @@ def format_timedelta(td):
     return " ".join(parts)
 
 
+def normalize_pagination(page: int, page_size: int) -> tuple[int, int]:
+    return max(0, int(page)), max(1, int(page_size))
+
+
+def calc_pages_total(total_items: int, page_size: int) -> int:
+    return max(1, (total_items + page_size - 1) // page_size)
+
+
+def get_page_bounds(page: int, page_size: int) -> tuple[int, int]:
+    start = page * page_size
+    return start, start + page_size
+
+
 @app.request("/page/nodes.mu")
 def nodes_mu(
     r: Request,
     query: str = "",
     mentions_for: str = "",
     page: int = 0,
-    page_size: int = 10,
+    page_size: int = DEFAULT_PAGE_SIZE,
 ):
     nodes_parsed = []
     items = []
     mentions_for_name = ""
+    total_items = 0
+    page, page_size = normalize_pagination(page, page_size)
 
     if mentions_for and query:
         raise Exception("mentioned_at and q mustn't be used together")
@@ -95,14 +113,17 @@ def nodes_mu(
         mention_node = find_node_by_address(mentions_for)
         if mention_node:
             mentions_for_name = mention_node["name"]
-        start = max(0, int(page)) * max(1, int(page_size))
-        end = start + max(1, int(page_size))
-        for n in get_nodes_for_addresses(mentioned_at)[start:end]:
+        mention_nodes = get_nodes_for_addresses(mentioned_at)
+        total_items = len(mention_nodes)
+        start, end = get_page_bounds(page, page_size)
+        for n in mention_nodes[start:end]:
             items.append((n["destination"], n))
     elif query:
+        total_items = count_nodes_filtered(query=query)
         for n in get_nodes_page(page=page, page_size=page_size, query=query):
             items.append((n["destination"], n))
     else:
+        total_items = count_nodes_filtered()
         for n in get_nodes_page(page=page, page_size=page_size):
             items.append((n["destination"], n))
 
@@ -124,6 +145,15 @@ def nodes_mu(
     return render_template(
         "nodes.mu",
         dict(
+            location=r.path,
+            location_params=(
+                ("mentions_for=" + mentions_for + "|")
+                if mentions_for
+                else (("query=" + query + "|") if query else "")
+            ),
+            page=page,
+            page_size=page_size,
+            pages_total=calc_pages_total(total_items, page_size),
             mentions_for=mentions_for_name,
             query=query or "",
             now=now().strftime(TIME_FORMAT),
@@ -137,8 +167,12 @@ def nodes_mu(
 
 
 @app.request("/page/peers.mu")
-def peers_mu(r: Request, query: str = "", page: int = 0, page_size: int = 100):
+def peers_mu(
+    r: Request, query: str = "", page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+):
+    page, page_size = normalize_pagination(page, page_size)
     peers_parsed = []
+    total_items = count_peers_filtered(query=query)
     for p in get_peers_page(page=page, page_size=page_size, query=query):
         last_online = datetime.datetime.fromtimestamp(
             p["time"], tz=datetime.timezone.utc
@@ -153,6 +187,11 @@ def peers_mu(r: Request, query: str = "", page: int = 0, page_size: int = 100):
     return render_template(
         "peers.mu",
         dict(
+            location=r.path,
+            location_params=(("query=" + query + "|") if query else ""),
+            page=page,
+            page_size=page_size,
+            pages_total=calc_pages_total(total_items, page_size),
             query=query or "",
             now=now().strftime(TIME_FORMAT),
             peers=sorted(peers_parsed, key=lambda p: p["last_online"], reverse=True),
@@ -180,10 +219,18 @@ def format_text(text: str) -> str:
 
 
 @app.request("/page/search.mu")
-def search(r: Request, query: str):
-    add_search_query(replace_line_breaks(query).strip())
+def search(
+    r: Request, query: str, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+):
+    page, page_size = normalize_pagination(page, page_size)
+    clean_query = replace_line_breaks(query).strip()
+    if page == 0:
+        add_search_query(clean_query)
 
-    entries = search_engine.query(query)
+    entries_all = search_engine.query(query, max_results=None)
+    total_items = len(entries_all)
+    start, end = get_page_bounds(page, page_size)
+    entries = entries_all[start:end]
     for e in entries:
         e.text = format_text(e.text)
         node_info = find_node_by_address(e.address)
@@ -194,28 +241,39 @@ def search(r: Request, query: str):
 
     try:
         hist = r.get_user_data([])
-        hist.append(dict(q=query, time=now().timestamp()))
+        hist.append(dict(q=clean_query, time=now().timestamp()))
         r.save_user_data(hist)
     except NotIdentified:
         pass
     return render_template(
         "search.mu",
         dict(
+            location=r.path,
+            location_params=("query=" + clean_query + "|"),
+            page=page,
+            page_size=page_size,
+            pages_total=calc_pages_total(total_items, page_size),
             entries=[e.to_dict() for e in entries],
-            total=len(entries),
-            query=replace_line_breaks(query).strip(),
+            total=total_items,
+            query=clean_query,
         ),
     )
 
 
 @app.request("/page/history.mu", identifying_required=True)
-def history(r: Request, page: int = 0):
+def history(r: Request, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE):
+    page, page_size = normalize_pagination(page, page_size)
     hist = list(reversed(r.get_user_data([])))
-    page_size = 20
-    hist_cut = hist[page * page_size : (page + 1) * page_size]
+    start, end = get_page_bounds(page, page_size)
+    hist_cut = hist[start:end]
+    total_items = len(hist)
     return render_template(
         "history.mu",
         dict(
+            location=r.path,
+            location_params="",
+            page_size=page_size,
+            pages_total=calc_pages_total(total_items, page_size),
             history=[
                 dict(
                     q=v["q"],
@@ -225,10 +283,8 @@ def history(r: Request, page: int = 0):
                 )
                 for v in hist_cut
             ],
-            total=len(hist_cut),
+            total=total_items,
             page=page,
-            has_next=(page + 1) * page_size < len(hist),
-            has_prev=page != 0,
         ),
     )
 
