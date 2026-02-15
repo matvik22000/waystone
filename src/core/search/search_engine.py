@@ -203,7 +203,9 @@ class SearchEngine:
 # Схема для индексации
 schema = Schema(
     url=ID(stored=True, unique=True),
-    text=TEXT(stored=True, analyzer=StemmingAnalyzer()),
+    text=TEXT(stored=True, analyzer=StemmingAnalyzer(
+        expression=re.compile(r"[^\W_]+(?:\.[^\W_]+)*", re.UNICODE)
+    )),
     owner=KEYWORD(stored=True),
     address=KEYWORD(stored=True),
     nodeName=TEXT(

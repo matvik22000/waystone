@@ -80,9 +80,9 @@ def load(url: str) -> Document | None:
 
 
 def extract(
-    doc: Document | None,
-    get_name_by_address: Callable[[str], str | None] | None = None,
-    update_citations: Callable[[str, tp.List[str]], None] | None = None,
+        doc: Document | None,
+        get_name_by_address: Callable[[str], str | None] | None = None,
+        update_citations: Callable[[str, tp.List[str]], None] | None = None,
 ) -> tp.List[str]:
     if not doc:
         return []
@@ -120,8 +120,8 @@ def extract(
 
 
 def crawl(
-    get_node_by_address: Callable[[str], str],
-    update_citations: Callable[[str, tp.List[str]], None],
+        get_node_by_address: Callable[[str], str],
+        update_citations: Callable[[str, tp.List[str]], None],
 ):
     logger = logging.getLogger("crawl-scheduler")
     crawler = Crawler(
