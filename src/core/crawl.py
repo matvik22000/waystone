@@ -7,8 +7,8 @@ from typing import Callable
 
 import RNS
 
-from core.search import SearchDocument
-from core.search import engine as search_engine
+from src.core.search import SearchDocument
+from src.core.search import engine as search_engine
 from src.config import CONFIG
 from src.core.crawler.crawler import Crawler
 from src.core.crawler.parser import extract_links

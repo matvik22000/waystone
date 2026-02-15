@@ -1,6 +1,6 @@
 from threading import Thread
 
-from core.search.pagerank import pagerank
+from src.core.search.pagerank import pagerank
 from src.config import CONFIG
 from src.core.data.citations import citations
 from src.core.data.nods_and_peers import find_node_by_address

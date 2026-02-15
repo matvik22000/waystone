@@ -5,11 +5,11 @@ from typing import List, Sequence, Dict, Tuple
 from sqlalchemy import select
 from sqlalchemy.sql.functions import count
 
-from core.data.db import get_session
-from core.data.models import Node
+from src.core.data.db import get_session
+from src.core.data.models import Node
 import numpy as np
 
-from core.search.models import SearchResult
+from src.core.search.models import SearchResult
 
 _LOGGER = logging.getLogger(__name__)
 

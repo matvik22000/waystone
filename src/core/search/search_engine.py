@@ -15,9 +15,9 @@ from whoosh.highlight import Formatter, get_text
 from whoosh.qparser import MultifieldParser, OrGroup
 from whoosh import scoring
 
-from core.data import get_path
-from core.search.models import SearchDocument, SearchResult
-from core.search.rerank import Ranker, ranker
+from src.core.data import get_path
+from src.core.search.models import SearchDocument, SearchResult
+from src.core.search.rerank import Ranker, ranker
 
 
 class MuBoldFormatter(Formatter):
