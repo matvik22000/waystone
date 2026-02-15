@@ -1,10 +1,11 @@
 from threading import Thread
 
+from core.data.nods_and_peers import upsert_node
 from src.core.search.pagerank import pagerank
 from src.config import CONFIG
 from src.core.data.citations import citations
 from src.core.data.nods_and_peers import find_node_by_address
-from src.core.utils import get_process_rss_bytes
+from src.core.utils import get_process_rss_bytes, now
 
 
 def main():
@@ -49,6 +50,7 @@ def main():
         lambda: logging.getLogger("announce").debug(
             "announce with data %s", CONFIG.ANNOUNCE_NAME
         )
+        or upsert_node(dst.hexhash, dst.identity.hexhash, CONFIG.ANNOUNCE_NAME, now().timestamp())
         or dst.announce(CONFIG.ANNOUNCE_NAME.encode("utf-8"))
     )
     app.scheduler.every(6).hours.do(pagerank)
