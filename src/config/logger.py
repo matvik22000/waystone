@@ -45,14 +45,14 @@ def config_logger(level: int, log_file_path: str):
         log_file_path, maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     main_handler.setFormatter(formatter)
-    main_handler.addFilter(NotCrawlerFilter())  # 👈 фильтр "всё кроме crawler-*"
+    main_handler.addFilter(NotCrawlerFilter())
 
     # Лог только для crawler-*
     crawler_handler = logging.handlers.RotatingFileHandler(
         "crawler.log", maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     crawler_handler.setFormatter(formatter)
-    crawler_handler.addFilter(CrawlerFilter())  # 👈 фильтр "только crawler-*"
+    crawler_handler.addFilter(CrawlerFilter())
 
     # Консоль
     console_handler = RNSLogHandler()
@@ -66,4 +66,5 @@ def config_logger(level: int, log_file_path: str):
             crawler_handler,
             console_handler,
         ],
+        force=True,
     )

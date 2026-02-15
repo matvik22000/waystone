@@ -30,23 +30,22 @@ def migrate_announces(path: str) -> int:
     now_ = _now()
     count = 0
     with get_session() as session:
-        for dest, rec in data.get("nodes", {}).items():
+        for _, rec in data.get("nodes", {}).items():
             session.add(
                 Node(
-                    destination=dest,
                     dst=rec["dst"],
                     identity=rec["identity"],
                     name=rec["name"],
                     time=rec["time"],
                     created_at=now_,
                     updated_at=now_,
+                    rank=0.0,
                 )
             )
             count += 1
-        for dest, rec in data.get("peers", {}).items():
+        for _, rec in data.get("peers", {}).items():
             session.add(
                 Peer(
-                    destination=dest,
                     dst=rec["dst"],
                     identity=rec["identity"],
                     name=rec["name"],

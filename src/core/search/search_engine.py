@@ -1,5 +1,4 @@
 import logging
-import math
 import os
 import time
 from collections import OrderedDict
@@ -8,63 +7,17 @@ from functools import lru_cache
 from threading import Lock
 from typing import Dict, List, Optional, Sequence
 
+from sqlalchemy import select
 from whoosh.analysis import StemmingAnalyzer, NgramWordAnalyzer
 from whoosh.fields import *
 from whoosh.filedb.filestore import FileStorage
 from whoosh.highlight import Formatter, get_text
 from whoosh.qparser import MultifieldParser, OrGroup
+from whoosh import scoring
 
-from . import get_path
-from .citations import Citations, citations
-
-
-@dataclass
-class SearchDocument:
-    """Документ для индексации в поисковой системе"""
-
-    url: str
-    text: str
-    owner: str
-    address: str
-    nodeName: str | None
-
-    def to_dict(self) -> Dict:
-        """Конвертирует документ в словарь для индексации"""
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict) -> "SearchDocument":
-        """Создает документ из словаря"""
-        return cls(**data)
-
-
-@dataclass
-class SearchResult:
-    """Результат поиска с подсветкой и релевантностью"""
-
-    url: str
-    text: str
-    owner: str
-    address: str
-    name: str
-    score: float
-
-    # highlighted_text: Optional[str] = None
-    # highlighted_node_name: Optional[str] = None
-
-    def to_dict(self) -> Dict:
-        """Конвертирует результат в словарь"""
-        result = asdict(self)
-        # Убираем None значения для чистоты
-        return {k: v for k, v in result.items() if v is not None}
-
-
-@dataclass
-class SearchWeights:
-    """Веса для ранжирования результатов поиска"""
-
-    text_search: float = 1
-    citations: float = 1.5
+from core.data import get_path
+from core.search.models import SearchDocument, SearchResult
+from core.search.rerank import Ranker, ranker
 
 
 class MuBoldFormatter(Formatter):
@@ -78,12 +31,11 @@ class MuBoldFormatter(Formatter):
 class SearchEngine:
     """Поисковая система с поддержкой индексации и поиска документов"""
 
-    def __init__(self, schema: Schema, citations: Citations):
+    def __init__(self, schema: Schema, ranker: Ranker):
         self.__lock = Lock()
         self.__cache_lock = Lock()
         self.schema = schema
-        self.citations = citations
-        self.weights = SearchWeights()
+        self.ranker = ranker
         self._index_queue: list[SearchDocument] = []
         self._index_batch_size = 10
         self._optimize_every_batches = 25
@@ -151,30 +103,28 @@ class SearchEngine:
         return self.ix.doc_count_all()
 
     def query(
-            self, q: str, highlight: bool = True, max_results: Optional[int] = 20
+            self, q: str, highlight: bool = True
     ) -> List[SearchResult]:
         """Выполняет поиск по запросу"""
         cache_key = self._normalize_query_cache_key(q)
         cached = self._get_cached_results(cache_key)
         if cached is not None:
-            if max_results is None:
-                return cached
-            return cached[:max_results]
+            return cached
 
         ranked = self._query_impl(highlight, q)
 
         self._set_cached_results(cache_key, ranked)
-        return ranked[:max_results]
+        return ranked
 
     def _query_impl(self, highlight, q):
         fields = ["url", "text", "nodeName", "owner", "address"]
         search_results: list[SearchResult] = []
-        with self.ix.searcher() as searcher:
+        with self.ix.searcher(weighting=scoring.BM25F()) as searcher:
             # We intentionally fetch full candidate set here and cache the globally ranked
             # result list, so pagination can reuse it cheaply for a few minutes.
             results = searcher.search(
                 MultifieldParser(
-                    fields, schema=self.schema, group=OrGroup.factory(1.5)
+                    fields, schema=self.schema, group=OrGroup
                 ).parse(q),
                 limit=None,
             )
@@ -192,84 +142,16 @@ class SearchEngine:
                     score=r.score,
                 )
 
-                # Добавляем подсветку если нужно
                 if highlight:
                     if r.get("text") and isinstance(r.get("text"), str):
                         result.text = r.highlights("text") or r["text"][:200]
-                    # if r.get("nodeName") and isinstance(r.get("nodeName"), str):
-                    #     result.highlighted_node_name = r.highlights("nodeName") or r["nodeName"][:200]
 
                 search_results.append(result)
 
-        search_results = self._filter_duplicates(search_results)
-        search_results = self._filter_same_address(search_results)
-        ranked = self._rank_results(search_results)
+        self.logger.debug("unranked results: %s", search_results)
+        ranked = self.ranker.rerank(search_results)
+        self.logger.debug("reranked results: %s", ranked)
         return ranked
-
-    def _rank_results(self, results: List[SearchResult]) -> List[SearchResult]:
-        """Ранжирует результаты с учетом цитирований"""
-        ranked_results = []
-        self.logger.debug("unranked results: %s", results)
-        for result in results:
-            # Вычисляем новый скор с учетом цитирований
-            citation_score = self.citations.get_amount_for(result.address)
-            new_score = (
-                    self.weights.text_search * result.score
-                    + self.weights.citations
-                    * (math.log(citation_score) if citation_score > 0 else 0)
-            )
-
-            # Создаем новый результат с обновленным скором
-            ranked_result = SearchResult(
-                url=result.url,
-                text=result.text,
-                owner=result.owner,
-                address=result.address,
-                name=result.name,
-                score=new_score,
-            )
-            ranked_results.append(ranked_result)
-
-        ranked_results.sort(key=lambda x: x.score, reverse=True)
-        self.logger.debug("ranked results: %s", ranked_results)
-        return ranked_results
-
-    @staticmethod
-    def _filter_duplicates(results: List[SearchResult]) -> List[SearchResult]:
-        """
-        drops duplicates identical urls, it's always a mistake to have more than one
-
-        :param results:
-        :return:
-        """
-        urls = set()
-        filtered_results = []
-        for result in results:
-            if result.url in urls:
-                continue
-            urls.add(result.url)
-            filtered_results.append(result)
-        return filtered_results
-
-    @staticmethod
-    def _filter_same_address(
-            results: List[SearchResult], max_same_address=2
-    ) -> List[SearchResult]:
-        """
-        drop extra pages on one address (somtimes result of search is 10 pages on one node. I don't need all ot them)
-
-        :param results:
-        :return:
-        """
-        addresses = {}
-        filtered_results = []
-
-        for result in results:
-            current_addresses_amount = addresses.get(result.address, 0)
-            if current_addresses_amount < max_same_address:
-                addresses[result.address] = current_addresses_amount + 1
-                filtered_results.append(result)
-        return filtered_results
 
     def save(self, path: str):
         """Сохраняет индекс в указанную директорию"""
@@ -327,4 +209,4 @@ schema = Schema(
 )
 
 # Глобальный экземпляр поисковой системы
-engine = SearchEngine(schema, citations)
+engine = SearchEngine(schema, ranker)

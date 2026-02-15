@@ -16,13 +16,13 @@ class Node(Base):
     __tablename__ = "nodes"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    destination: Mapped[str] = mapped_column(String(70), unique=True, nullable=False)
-    dst: Mapped[str] = mapped_column(String(64), nullable=False)
+    dst: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     identity: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     time: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
     updated_at: Mapped[float] = mapped_column(Float, nullable=False)
+    rank: Mapped[float] = mapped_column(Float, nullable=False)
 
     __table_args__ = (
         Index("idx_nodes_identity", "identity"),
@@ -34,8 +34,7 @@ class Peer(Base):
     __tablename__ = "peers"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    destination: Mapped[str] = mapped_column(String(70), unique=True, nullable=False)
-    dst: Mapped[str] = mapped_column(String(64), nullable=False)
+    dst: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     identity: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     time: Mapped[float] = mapped_column(Float, nullable=False)

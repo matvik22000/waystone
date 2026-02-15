@@ -1,8 +1,9 @@
 from threading import Thread
 
+from core.search.pagerank import pagerank
 from src.config import CONFIG
 from src.core.data.citations import citations
-from src.core.data.store import find_node_by_address
+from src.core.data.nods_and_peers import find_node_by_address
 from src.core.utils import get_process_rss_bytes
 
 
@@ -50,6 +51,7 @@ def main():
         )
         or dst.announce(CONFIG.ANNOUNCE_NAME.encode("utf-8"))
     )
+    app.scheduler.every(6).hours.do(pagerank)
     app.scheduler.every(5).minutes.do(log_rss_usage)
     app.scheduler.every(1).hours.do(start_crawling_in_thread)
 
@@ -59,7 +61,7 @@ def main():
     def handle_exception(e: Exception) -> AbstractResponse:
         log = logging.getLogger("e_handler")
         log.error("Uncaught exception: %s", e)
-        log.debug(e, exc_info=True)
+        log.error(e, exc_info=True)
 
         return render_template("error.mu", dict(error=str(e)))
 

@@ -13,7 +13,7 @@ def _now() -> float:
 
 def _node_to_dict(row: Node) -> dict:
     return {
-        "destination": row.destination,
+        "destination": f"<{row.dst}>",
         "dst": row.dst,
         "identity": row.identity,
         "name": row.name,
@@ -23,7 +23,7 @@ def _node_to_dict(row: Node) -> dict:
 
 def _peer_to_dict(row: Peer) -> dict:
     return {
-        "destination": row.destination,
+        "destination": f"<{row.dst}>",
         "dst": row.dst,
         "identity": row.identity,
         "name": row.name,
@@ -36,7 +36,7 @@ def get_nodes() -> dict:
     with get_session() as session:
         rows = session.execute(select(Node)).scalars().all()
         return {
-            row.destination: {
+            f"<{row.dst}>": {
                 "dst": row.dst,
                 "identity": row.identity,
                 "name": row.name,
@@ -51,7 +51,7 @@ def get_peers() -> dict:
     with get_session() as session:
         rows = session.execute(select(Peer)).scalars().all()
         return {
-            row.destination: {
+            f"<{row.dst}>": {
                 "dst": row.dst,
                 "identity": row.identity,
                 "name": row.name,
@@ -66,10 +66,11 @@ def get_nodes_page(page: int = 0, page_size: int = 100, query: str = "") -> list
     page_size = max(1, min(int(page_size), 1000))
 
     with get_session() as session:
-        q = select(Node).order_by(desc(Node.time))
+        q = select(Node).order_by(desc(Node.rank), desc(Node.time))
         if query:
             like = f"%{query}%"
             q = q.where((Node.name.ilike(like)) | (Node.dst.ilike(like)))
+
         rows = (
             session.execute(q.offset(page * page_size).limit(page_size))
             .scalars()
@@ -141,12 +142,11 @@ def count_peers_filtered(query: str = "") -> int:
         return int(session.execute(q).scalar_one())
 
 
-def upsert_node(destination: str, dst: str, identity: str, name: str, ts: float) -> None:
+def upsert_node(dst: str, identity: str, name: str, ts: float) -> None:
     with get_session() as session:
-        row = session.execute(select(Node).where(Node.destination == destination)).scalars().first()
+        row = session.execute(select(Node).where(Node.dst == dst)).scalars().first()
         now_ = _now()
         if row:
-            row.dst = dst
             row.identity = identity
             row.name = name
             row.time = ts
@@ -154,23 +154,22 @@ def upsert_node(destination: str, dst: str, identity: str, name: str, ts: float)
         else:
             session.add(
                 Node(
-                    destination=destination,
                     dst=dst,
                     identity=identity,
                     name=name,
                     time=ts,
                     created_at=now_,
                     updated_at=now_,
+                    rank=0.0,
                 )
             )
 
 
-def upsert_peer(destination: str, dst: str, identity: str, name: str, ts: float) -> None:
+def upsert_peer(dst: str, identity: str, name: str, ts: float) -> None:
     with get_session() as session:
-        row = session.execute(select(Peer).where(Peer.destination == destination)).scalars().first()
+        row = session.execute(select(Peer).where(Peer.dst == dst)).scalars().first()
         now_ = _now()
         if row:
-            row.dst = dst
             row.identity = identity
             row.name = name
             row.time = ts
@@ -178,7 +177,6 @@ def upsert_peer(destination: str, dst: str, identity: str, name: str, ts: float)
         else:
             session.add(
                 Peer(
-                    destination=destination,
                     dst=dst,
                     identity=identity,
                     name=name,
@@ -204,15 +202,3 @@ def find_node_by_address(address: str) -> tp.Optional[dict]:
             return None
         return _node_to_dict(row)
 
-
-# Backward compatibility: store.get("nodes", {}) and store.get("peers", {})
-class _StoreCompat:
-    def get(self, key: str, default=None):
-        if key == "nodes":
-            return get_nodes()
-        if key == "peers":
-            return get_peers()
-        return default
-
-
-store = _StoreCompat()

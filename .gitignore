@@ -11,3 +11,5 @@ meshchat_interfaces.txt
 __pycache__/
 *.py[cod]
 *.log
+sandbox
+sandbox/*

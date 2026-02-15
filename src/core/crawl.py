@@ -7,13 +7,13 @@ from typing import Callable
 
 import RNS
 
+from core.search import SearchDocument
+from core.search import engine as search_engine
 from src.config import CONFIG
-from src.core.data.search import SearchDocument
 from src.core.crawler.crawler import Crawler
 from src.core.crawler.parser import extract_links
 from src.core.crawler.rns_request import address_from_url, request
-from src.core.data import search_engine
-from src.core.data.store import get_recent_nodes_for_crawl
+from src.core.data.nods_and_peers import get_recent_nodes_for_crawl
 
 logger = logging.getLogger("crawler")
 

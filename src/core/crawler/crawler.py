@@ -43,9 +43,9 @@ class _DbVisitedSet:
                     return True
 
                 last_ts = existing.last_visited_at or existing.created_at
-                existing.last_visited_at = now_ts
                 if now_ts - last_ts < self._cache_seconds:
                     return False
+                existing.last_visited_at = now_ts
                 return True
 
 
@@ -120,8 +120,8 @@ class Crawler:
         self,
         load: Loader,
         page_processor: Extractor,
-        queue_maxsize: int = 5000,
-        visited_cache_seconds: int = 86400,
+        queue_maxsize: int,
+        visited_cache_seconds: int,
     ):
         self._load = load
         self._extract = page_processor

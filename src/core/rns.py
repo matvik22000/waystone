@@ -6,7 +6,7 @@ import RNS
 
 from src.api import create_rns_dest
 from src.config import CONFIG
-from src.core.data.store import upsert_node, upsert_peer
+from src.core.data.nods_and_peers import upsert_node, upsert_peer
 from src.core.utils import now
 import RNS.vendor.umsgpack as msgpack
 
@@ -38,9 +38,9 @@ class AnnounceHandler:
         dst_clean = destination.replace("<", "").replace(">", "")
         ts = now().timestamp()
         if self.key == "nodes":
-            upsert_node(destination, dst_clean, f"{announced_identity.hexhash}", name, ts)
+            upsert_node(dst_clean, f"{announced_identity.hexhash}", name, ts)
         else:
-            upsert_peer(destination, dst_clean, f"{announced_identity.hexhash}", name, ts)
+            upsert_peer(dst_clean, f"{announced_identity.hexhash}", name, ts)
 
 
 RNS.Transport.register_announce_handler(AnnounceHandler("lxmf.delivery", "peers"))

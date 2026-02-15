@@ -17,8 +17,9 @@ class __Cfg(Config):
 
     TEMPLATES_DIR: str = required()
     LOG_PATH: str = optional("app.log")
+    LOG_LEVEL: str = required()
 
 
 CONFIG: __Cfg = __Cfg()
 
-config_logger(logging.DEBUG, CONFIG.LOG_PATH)
+config_logger(getattr(logging, CONFIG.LOG_LEVEL.upper(), logging.INFO), CONFIG.LOG_PATH)

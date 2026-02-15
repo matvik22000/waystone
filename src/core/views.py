@@ -8,9 +8,9 @@ from src.api.app import Config
 from src.api.exceptions import NotIdentified, BadRequest
 from src.api.handlers import Request, render_template
 from src.config import CONFIG
-from src.core.data import search_engine
 from src.core.data.queries import add_search_query, get_last_search_queries
-from src.core.data.store import (
+from src.core.data.user_search_history import user_search_history
+from src.core.data.nods_and_peers import (
     count_nodes_filtered,
     count_peers_filtered,
     count_nodes,
@@ -22,6 +22,7 @@ from src.core.data.store import (
 )
 from src.core.rns import dst, identity
 from src.core.utils import now
+from src.core.search import engine as search_engine
 
 app = NomadAPI(
     Config(
@@ -34,6 +35,7 @@ app = NomadAPI(
 TIME_FORMAT = CONFIG.TIME_FORMAT
 DEFAULT_PAGE_SIZE = 20
 logger = logging.getLogger("views")
+
 
 @app.request("/page/index.mu")
 def index(r: Request):
@@ -94,11 +96,11 @@ def get_page_bounds(page: int, page_size: int) -> tuple[int, int]:
 
 @app.request("/page/nodes.mu")
 def nodes_mu(
-    r: Request,
-    query: str = "",
-    mentions_for: str = "",
-    page: int = 0,
-    page_size: int = DEFAULT_PAGE_SIZE,
+        r: Request,
+        query: str = "",
+        mentions_for: str = "",
+        page: int = 0,
+        page_size: int = DEFAULT_PAGE_SIZE,
 ):
     nodes_parsed = []
     items = []
@@ -156,18 +158,14 @@ def nodes_mu(
             mentions_for=mentions_for_name,
             query=query or "",
             now=now().strftime(TIME_FORMAT),
-            nodes=sorted(
-                nodes_parsed,
-                key=lambda p: (p["citations"], p["last_online"]),
-                reverse=True,
-            ),
+            nodes=nodes_parsed,
         ),
     )
 
 
 @app.request("/page/peers.mu")
 def peers_mu(
-    r: Request, query: str = "", page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+        r: Request, query: str = "", page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
 ):
     page, page_size = normalize_pagination(page, page_size)
     peers_parsed = []
@@ -219,14 +217,14 @@ def format_text(text: str) -> str:
 
 @app.request("/page/search.mu")
 def search(
-    r: Request, query: str, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+        r: Request, query: str, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
 ):
     page, page_size = normalize_pagination(page, page_size)
     clean_query = replace_line_breaks(query).strip()
     if page == 0:
         add_search_query(clean_query)
 
-    entries_all = search_engine.query(query, max_results=None)
+    entries_all = search_engine.query(query)
     total_items = len(entries_all)
     start, end = get_page_bounds(page, page_size)
     entries = entries_all[start:end]
@@ -239,9 +237,7 @@ def search(
             e.name = e.url
 
     try:
-        hist = r.get_user_data([])
-        hist.append(dict(q=clean_query, time=now().timestamp()))
-        r.save_user_data(hist)
+        user_search_history.add(r.get_remote_identity(), clean_query, now().timestamp())
     except NotIdentified:
         pass
     return render_template(
@@ -262,10 +258,9 @@ def search(
 @app.request("/page/history.mu", identifying_required=True)
 def history(r: Request, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE):
     page, page_size = normalize_pagination(page, page_size)
-    hist = list(reversed(r.get_user_data([])))
-    start, end = get_page_bounds(page, page_size)
-    hist_cut = hist[start:end]
-    total_items = len(hist)
+    remote_identity = r.get_remote_identity()
+    hist_cut = user_search_history.list(remote_identity, page=page, page_size=page_size)
+    total_items = user_search_history.count(remote_identity)
     return render_template(
         "history.mu",
         dict(
