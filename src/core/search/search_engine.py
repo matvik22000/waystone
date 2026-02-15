@@ -98,6 +98,12 @@ class SearchEngine:
             writer.update_document(**filtered_dict)
         writer.commit(optimize=optimize)
 
+    def delete_by_address(self, address: list[str]):
+        writer = self.ix.writer()
+        for address in address:
+            writer.delete_by_term("address", address)
+        writer.commit(optimize=True)
+
     def get_index_size(self) -> int:
         """Возвращает количество документов в индексе"""
         return self.ix.doc_count_all()

@@ -130,7 +130,7 @@ def crawl(
         queue_maxsize=CONFIG.CRAWLER_QUEUE_MAXSIZE,
         visited_cache_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS,
     )
-    recent_nodes = get_recent_nodes_for_crawl(within_seconds=86400)
+    recent_nodes = get_recent_nodes_for_crawl(within_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS)
     if not recent_nodes:
         logger.warning("No known nodes to crawl")
         return

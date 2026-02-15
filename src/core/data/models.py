@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    Boolean,
     Float,
     Index,
     String,
@@ -23,6 +24,7 @@ class Node(Base):
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
     updated_at: Mapped[float] = mapped_column(Float, nullable=False)
     rank: Mapped[float] = mapped_column(Float, nullable=False)
+    removed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
         Index("idx_nodes_identity", "identity"),
@@ -54,6 +56,7 @@ class Citation(Base):
     target_address: Mapped[str] = mapped_column(String(32), nullable=False)
     src_address: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    removed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
         UniqueConstraint("target_address", "src_address", name="uq_citations_target_src"),

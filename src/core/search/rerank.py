@@ -81,7 +81,10 @@ class Ranker:
         unique_addresses = set(dict.fromkeys(addresses))
         with get_session() as session:
             rows = session.execute(
-                select(Node.dst, Node.rank).where(Node.dst.in_(unique_addresses))
+                select(Node.dst, Node.rank).where(
+                    Node.dst.in_(unique_addresses),
+                    Node.removed.is_(False),
+                )
             ).all()
             res = {dst: float(rank) for dst, rank in rows}
 

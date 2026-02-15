@@ -18,9 +18,13 @@ def pagerank(batch_size: int = 500) -> dict[Hashable, float]:
 
     with get_session() as session:
         edges = session.execute(
-            select(Citation.src_address, Citation.target_address)
+            select(Citation.src_address, Citation.target_address).where(
+                Citation.removed.is_(False)
+            )
         ).all()
-        vertices = session.execute(select(Node.dst)).scalars().all()
+        vertices = session.execute(
+            select(Node.dst).where(Node.removed.is_(False))
+        ).scalars().all()
 
     _LOGGER.info("started pagerank for %s edges; %s nodes", len(edges), len(vertices))
     ranks = pagerank_impl(edges, set(vertices))

@@ -21,7 +21,9 @@ def init_db() -> None:
     os.makedirs(os.path.dirname(_db_path) or ".", exist_ok=True)
     Base.metadata.create_all(bind=_engine)
     _migrate_nodes_schema_drop_destination()
+    _migrate_nodes_add_removed()
     _migrate_peers_schema_drop_destination()
+    _migrate_citations_add_removed()
 
 
 def _migrate_nodes_schema_drop_destination() -> None:
@@ -44,14 +46,15 @@ def _migrate_nodes_schema_drop_destination() -> None:
                 "time FLOAT NOT NULL, "
                 "created_at FLOAT NOT NULL, "
                 "updated_at FLOAT NOT NULL, "
-                "rank FLOAT NOT NULL)"
+                "rank FLOAT NOT NULL, "
+                "removed BOOLEAN NOT NULL DEFAULT 0)"
             )
         )
         if has_rank:
             conn.execute(
                 text(
-                    "INSERT INTO nodes_new (id, dst, identity, name, time, created_at, updated_at, rank) "
-                    "SELECT n.id, n.dst, n.identity, n.name, n.time, n.created_at, n.updated_at, n.rank "
+                    "INSERT INTO nodes_new (id, dst, identity, name, time, created_at, updated_at, rank, removed) "
+                    "SELECT n.id, n.dst, n.identity, n.name, n.time, n.created_at, n.updated_at, n.rank, 0 "
                     "FROM nodes n "
                     "WHERE n.id = ("
                     "  SELECT n2.id FROM nodes n2 "
@@ -63,8 +66,8 @@ def _migrate_nodes_schema_drop_destination() -> None:
         else:
             conn.execute(
                 text(
-                    "INSERT INTO nodes_new (id, dst, identity, name, time, created_at, updated_at, rank) "
-                    "SELECT n.id, n.dst, n.identity, n.name, n.time, n.created_at, n.updated_at, 0.0 "
+                    "INSERT INTO nodes_new (id, dst, identity, name, time, created_at, updated_at, rank, removed) "
+                    "SELECT n.id, n.dst, n.identity, n.name, n.time, n.created_at, n.updated_at, 0.0, 0 "
                     "FROM nodes n "
                     "WHERE n.id = ("
                     "  SELECT n2.id FROM nodes n2 "
@@ -77,6 +80,19 @@ def _migrate_nodes_schema_drop_destination() -> None:
         conn.execute(text("ALTER TABLE nodes_new RENAME TO nodes"))
         conn.execute(text("CREATE INDEX idx_nodes_identity ON nodes(identity)"))
         conn.execute(text("CREATE INDEX idx_nodes_time ON nodes(time)"))
+
+
+def _migrate_nodes_add_removed() -> None:
+    with _engine.begin() as conn:
+        rows = conn.execute(text("PRAGMA table_info(nodes)")).fetchall()
+        if not rows:
+            return
+        columns = {row[1] for row in rows}
+        if "removed" in columns:
+            return
+        conn.execute(
+            text("ALTER TABLE nodes ADD COLUMN removed BOOLEAN NOT NULL DEFAULT 0")
+        )
 
 
 def _migrate_peers_schema_drop_destination() -> None:
@@ -116,6 +132,19 @@ def _migrate_peers_schema_drop_destination() -> None:
         conn.execute(text("ALTER TABLE peers_new RENAME TO peers"))
         conn.execute(text("CREATE INDEX idx_peers_identity ON peers(identity)"))
         conn.execute(text("CREATE INDEX idx_peers_time ON peers(time)"))
+
+
+def _migrate_citations_add_removed() -> None:
+    with _engine.begin() as conn:
+        rows = conn.execute(text("PRAGMA table_info(citations)")).fetchall()
+        if not rows:
+            return
+        columns = {row[1] for row in rows}
+        if "removed" in columns:
+            return
+        conn.execute(
+            text("ALTER TABLE citations ADD COLUMN removed BOOLEAN NOT NULL DEFAULT 0")
+        )
 
 
 @contextmanager
