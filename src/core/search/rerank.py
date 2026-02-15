@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import List, Sequence, Dict, Tuple
+from typing import List, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.sql.functions import count
@@ -30,7 +30,7 @@ class Ranker:
         if not results:
             return []
         ranked_results = []
-        (ranks,) = map(np.array, zip(*self._get_node_features([r.address for r in results])))
+        ranks = np.array(self._get_node_features([r.address for r in results]), dtype=float)
         text_scores = np.array([r.score for r in results], dtype=float)
 
         text_scores_norm = self._minmax(text_scores)
@@ -72,7 +72,7 @@ class Ranker:
         return text_scores_norm
 
     @staticmethod
-    def _get_node_features(addresses: Sequence[str]) -> List[Tuple[float]]:
+    def _get_node_features(addresses: Sequence[str]) -> List[float]:
         """
 
         :param addresses:
@@ -83,9 +83,9 @@ class Ranker:
             rows = session.execute(
                 select(Node.dst, Node.rank).where(Node.dst.in_(unique_addresses))
             ).all()
-            res = {dst: (float(rank),) for dst, rank in rows}
+            res = {dst: float(rank) for dst, rank in rows}
 
-        return [res.get(addr, 0) for addr in addresses]
+        return [res.get(addr, 0.0) for addr in addresses]
 
     @staticmethod
     def _filter_duplicates(results: List[SearchResult]) -> List[SearchResult]:
