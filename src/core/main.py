@@ -1,6 +1,6 @@
 from threading import Thread
 
-from core.data.nods_and_peers import upsert_node
+from src.core.data.nods_and_peers import upsert_node
 from src.core.search.pagerank import pagerank
 from src.config import CONFIG
 from src.core.data.citations import citations
