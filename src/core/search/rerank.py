@@ -85,7 +85,7 @@ class Ranker:
             ).all()
             res = {dst: (float(rank),) for dst, rank in rows}
 
-        return [res[addr] for addr in addresses]
+        return [res.get(addr, 0) for addr in addresses]
 
     @staticmethod
     def _filter_duplicates(results: List[SearchResult]) -> List[SearchResult]:
