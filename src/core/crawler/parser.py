@@ -35,8 +35,8 @@ def parse_link_block(link: str):
             return url
         return url + "`" + params
     else:
-        raise ValueError("unable to parse link %s" % link)
-
+        # raise ValueError("unable to parse link %s" % link)
+        return ""
 
 def is_external(link: str) -> bool:
     """
