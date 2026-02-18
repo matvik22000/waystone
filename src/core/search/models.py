@@ -32,6 +32,10 @@ class SearchResult:
     address: str
     name: str
     score: float
+    p_dead_low: float | None = None
+    p_dead_high: float | None = None
+    time: float | None = None
+    since_announce: str | None = None
 
     # highlighted_text: Optional[str] = None
     # highlighted_node_name: Optional[str] = None

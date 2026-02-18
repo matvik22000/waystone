@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Boolean,
     Float,
+    Integer,
     Index,
     String,
     Text,
@@ -25,6 +26,10 @@ class Node(Base):
     updated_at: Mapped[float] = mapped_column(Float, nullable=False)
     rank: Mapped[float] = mapped_column(Float, nullable=False)
     removed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    announce_alpha: Mapped[float | None] = mapped_column(Float, nullable=True)
+    announce_beta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    announce_window_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    announce_k_events: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("idx_nodes_identity", "identity"),

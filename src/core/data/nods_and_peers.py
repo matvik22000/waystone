@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, or_, select, update
 
 from src.core.data.db import get_session
 from src.core.data.models import Citation, Node, Peer
+from src.core.search.nodes_downtime import PRIOR_ANNOUNCE, dead_probability_ci
 
 
 def _now() -> float:
@@ -12,12 +13,24 @@ def _now() -> float:
 
 
 def _node_to_dict(row: Node) -> dict:
+    now_ts = _now()
+    alpha = float(row.announce_alpha) if row.announce_alpha is not None else float(PRIOR_ANNOUNCE[0])
+    beta = float(row.announce_beta) if row.announce_beta is not None else float(PRIOR_ANNOUNCE[1])
+    p_dead_low, p_dead_high = dead_probability_ci(
+        alpha,
+        beta,
+        max(0.0, now_ts - float(row.time)),
+        ci=0.90,
+    )
     return {
         "destination": f"<{row.dst}>",
         "dst": row.dst,
         "identity": row.identity,
         "name": row.name,
         "time": row.time,
+        "p_dead_low": p_dead_low,
+        "p_dead_high": p_dead_high,
+        "dead_ci": f"{p_dead_low:.2f}-{p_dead_high:.2f}",
     }
 
 

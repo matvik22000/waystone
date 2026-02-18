@@ -15,12 +15,17 @@ class __Cfg(Config):
     CRAWLER_QUEUE_MAXSIZE: int = optional(5000)
     CRAWLER_VISITED_CACHE_SECONDS: int = optional(24 * 60 * 60)
     NODE_REMOVE_AFTER_DAYS: int = optional(30)
+    NOMAD_NODE_ANNOUNCE_LOG_KEEP_DAYS: int = optional(14)
 
     TEMPLATES_DIR: str = required()
-    LOG_PATH: str = optional("app.log")
+    LOG_PATH: str = optional("logs")
     LOG_LEVEL: str = required()
 
 
 CONFIG: __Cfg = __Cfg()
 
-config_logger(getattr(logging, CONFIG.LOG_LEVEL.upper(), logging.INFO), CONFIG.LOG_PATH)
+config_logger(
+    getattr(logging, CONFIG.LOG_LEVEL.upper(), logging.INFO),
+    CONFIG.LOG_PATH,
+    CONFIG.NOMAD_NODE_ANNOUNCE_LOG_KEEP_DAYS,
+)

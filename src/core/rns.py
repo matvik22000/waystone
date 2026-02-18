@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 
 import LXMF
@@ -38,6 +39,12 @@ class AnnounceHandler:
         dst_clean = destination.replace("<", "").replace(">", "")
         ts = now().timestamp()
         if self.key == "nodes":
+            logging.getLogger("nomadnetwork.node.announce").info(
+                json.dumps(
+                    {"datetime": datetime.datetime.utcfromtimestamp(ts).isoformat(), "dst": dst_clean},
+                    ensure_ascii=False,
+                )
+            )
             upsert_node(dst_clean, f"{announced_identity.hexhash}", name, ts)
         else:
             upsert_peer(dst_clean, f"{announced_identity.hexhash}", name, ts)

@@ -132,16 +132,16 @@ def nodes_mu(
         last_online = datetime.datetime.fromtimestamp(
             n["time"], tz=datetime.timezone.utc
         )
-        nodes = dict(
-            dst=format_for_link(dst),
-            name=n["name"],
-            ident=format_for_link(n["identity"]),
-            owner=find_owner(n["identity"]) or ("Unknown", "Unknown"),
-            citations=citations.get_amount_for(format_for_link(dst)),
-            last_online=last_online.strftime(TIME_FORMAT),
-            since_online=format_timedelta(since_online(last_online)),
-        )
-        nodes_parsed.append(nodes)
+        node = {
+            **n,
+            **dict(
+                dst=format_for_link(dst),
+                owner=find_owner(n["identity"]) or ("Unknown", "Unknown"),
+                citations=citations.get_amount_for(format_for_link(dst)),
+                last_announce=last_online.strftime(TIME_FORMAT),
+                since_announce=format_timedelta(since_online(last_online)),
+            )}
+        nodes_parsed.append(node)
 
     return render_template(
         "nodes.mu",
@@ -177,8 +177,8 @@ def peers_mu(
         peer = dict(
             dst=format_for_link(p["destination"]),
             name=p["name"],
-            last_online=last_online.strftime(TIME_FORMAT),
-            since_online=format_timedelta(since_online(last_online)),
+            last_announce=last_online.strftime(TIME_FORMAT),
+            since_announce=format_timedelta(since_online(last_online)),
         )
         peers_parsed.append(peer)
     return render_template(
@@ -191,7 +191,7 @@ def peers_mu(
             pages_total=calc_pages_total(total_items, page_size),
             query=query or "",
             now=now().strftime(TIME_FORMAT),
-            peers=sorted(peers_parsed, key=lambda p: p["last_online"], reverse=True),
+            peers=sorted(peers_parsed, key=lambda p: p["last_announce"], reverse=True),
         ),
     )
 
@@ -230,6 +230,9 @@ def search(
     entries = entries_all[start:end]
     for e in entries:
         e.text = format_text(e.text)
+        if e.time:
+            last_online = datetime.datetime.fromtimestamp(e.time, tz=datetime.timezone.utc)
+            e.since_announce = format_timedelta(since_online(last_online))
         node_info = find_node_by_address(e.address)
         if node_info:
             e.name = node_info["name"] + " " + e.url.split(":")[1]

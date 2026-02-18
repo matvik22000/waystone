@@ -22,6 +22,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=_engine)
     _migrate_nodes_schema_drop_destination()
     _migrate_nodes_add_removed()
+    _migrate_nodes_add_survival_columns()
     _migrate_peers_schema_drop_destination()
     _migrate_citations_add_removed()
 
@@ -93,6 +94,24 @@ def _migrate_nodes_add_removed() -> None:
         conn.execute(
             text("ALTER TABLE nodes ADD COLUMN removed BOOLEAN NOT NULL DEFAULT 0")
         )
+
+
+def _migrate_nodes_add_survival_columns() -> None:
+    with _engine.begin() as conn:
+        rows = conn.execute(text("PRAGMA table_info(nodes)")).fetchall()
+        if not rows:
+            return
+        columns = {row[1] for row in rows}
+        migrations = [
+            ("announce_alpha", "FLOAT"),
+            ("announce_beta", "FLOAT"),
+            ("announce_window_seconds", "FLOAT"),
+            ("announce_k_events", "INTEGER"),
+        ]
+        for col, col_type in migrations:
+            if col in columns:
+                continue
+            conn.execute(text(f"ALTER TABLE nodes ADD COLUMN {col} {col_type}"))
 
 
 def _migrate_peers_schema_drop_destination() -> None:

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, asdict
@@ -98,11 +99,16 @@ class SearchEngine:
             writer.update_document(**filtered_dict)
         writer.commit(optimize=optimize)
 
-    def delete_by_address(self, address: list[str]):
+    def delete_by_address(self, address: str | Sequence[str]):
+        addresses = [address] if isinstance(address, str) else list(address)
+        if not addresses:
+            return
         writer = self.ix.writer()
-        for address in address:
-            writer.delete_by_term("address", address)
+        for addr in addresses:
+            writer.delete_by_term("address", addr)
         writer.commit(optimize=True)
+        with self.__cache_lock:
+            self._query_cache.clear()
 
     def get_index_size(self) -> int:
         """Возвращает количество документов в индексе"""
