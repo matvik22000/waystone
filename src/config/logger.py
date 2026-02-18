@@ -50,7 +50,7 @@ def config_logger(level: int, log_folder_path: str, announce_keep_days):
 
     # Лог только для crawler-*
     crawler_handler = logging.handlers.RotatingFileHandler(
-        "crawler.log", maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
+        os.path.join(log_folder_path, "crawler.log"), maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     crawler_handler.setFormatter(formatter)
     crawler_handler.addFilter(CrawlerFilter())
