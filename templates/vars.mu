@@ -19,7 +19,7 @@
 {%- endmacro %}
 
 {% macro status_icon (p_dead_low, p_dead_high) %}
-    {%- if p_dead_low >= 0.9 %}🔴{% elif p_dead_high <= 0.15 %}🟢{% else %}🟡{% endif -%}
+    {%- if p_dead_low >= 0.9 %}🔴{% elif p_dead_high <= 0.1 %}🟢{% else %}🟡{% endif -%}
 {% endmacro %}
 
 

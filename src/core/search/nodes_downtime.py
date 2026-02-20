@@ -16,8 +16,8 @@ from src.core.data.models import Node
 
 Number = Union[int, float]
 
-PRIOR_DOWN = (4.0531142381893885e-06, 9.108212106296508e-05)  # alpha, beta or up/down formula
-PRIOR_ANNOUNCE = (1.0, 60 * 60)  # by default, expecting 1 announce in hour
+PRIOR_DOWN = (4.006664496255316e-07, 2.7477094546713775e-05)  # alpha, beta or up/down formula
+PRIOR_ANNOUNCE = (1.0, 60 * 30)  # by default, expecting 1 announce 30 minutes
 
 
 @dataclass(frozen=True)
