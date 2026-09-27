@@ -1,0 +1,8 @@
+start ['VmHWM:\t   14020 kB', 'VmRSS:\t   14020 kB', 'VmSwap:\t       0 kB']
+import ['VmHWM:\t  133860 kB', 'VmRSS:\t  133860 kB', 'VmSwap:\t       0 kB']
+pagerank 1 3527 3742 0.06090510310605168
+pagerank 3 10581 11226 0.19386872788891196
+pagerank 5 17635 18710 0.33115293784067035
+actual_nommap network 546 2.303179665002972
+actual_nommap page 1337 9.141425414942205
+actual_end ['VmHWM:\t  192680 kB', 'VmRSS:\t  188984 kB', 'VmSwap:\t       0 kB']

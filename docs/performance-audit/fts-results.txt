@@ -1,0 +1,12 @@
+start ['VmHWM:\t   14200 kB', 'VmRSS:\t   14200 kB', 'VmSwap:\t       0 kB']
+import ['VmHWM:\t  133784 kB', 'VmRSS:\t  133784 kB', 'VmSwap:\t       0 kB']
+build 1.2008077900391072 bytes 93290496
+candidate reticulum 200 0.0019875718280673027
+snippets20 reticulum 0.0021529879886657
+candidate test 200 0.0013847390655428171
+snippets20 test 0.0005572009831666946
+candidate network 200 0.002002974972128868
+snippets20 network 0.0019951029680669308
+candidate page 200 0.005720754852518439
+snippets20 page 0.0834199539385736
+end ['VmHWM:\t  155192 kB', 'VmRSS:\t  150128 kB', 'VmSwap:\t       0 kB']

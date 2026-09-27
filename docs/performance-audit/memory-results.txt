@@ -1,0 +1,12 @@
+start ['VmHWM:\t   14120 kB', 'VmRSS:\t   14120 kB', 'VmSwap:\t       0 kB']
+import ['VmHWM:\t  134008 kB', 'VmRSS:\t  134008 kB', 'VmSwap:\t       0 kB']
+searcher ['VmHWM:\t  623820 kB', 'VmRSS:\t  623820 kB', 'VmSwap:\t       0 kB']
+parse ['VmHWM:\t  624044 kB', 'VmRSS:\t  624044 kB', 'VmSwap:\t       0 kB']
+collect ['VmHWM:\t  625036 kB', 'VmRSS:\t  625036 kB', 'VmSwap:\t       0 kB']
+hits 2696
+fields0 ['VmHWM:\t  672148 kB', 'VmRSS:\t  672148 kB', 'VmSwap:\t       0 kB']
+fields9 ['VmHWM:\t  672148 kB', 'VmRSS:\t  672148 kB', 'VmSwap:\t       0 kB']
+fields99 ['VmHWM:\t  673272 kB', 'VmRSS:\t  673272 kB', 'VmSwap:\t       0 kB']
+fields999 ['VmHWM:\t  673704 kB', 'VmRSS:\t  673704 kB', 'VmSwap:\t       0 kB']
+fields_end ['VmHWM:\t  677132 kB', 'VmRSS:\t  674736 kB', 'VmSwap:\t       0 kB']
+closed ['VmHWM:\t  677132 kB', 'VmRSS:\t  408988 kB', 'VmSwap:\t       0 kB']

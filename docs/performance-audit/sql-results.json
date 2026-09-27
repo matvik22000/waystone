@@ -1,0 +1,226 @@
+{
+  "nodes_page": {
+    "plan": [
+      [
+        7,
+        0,
+        0,
+        "SCAN nodes"
+      ],
+      [
+        39,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ],
+    "median_ms": 0.27461303398013115,
+    "rows": 20
+  },
+  "nodes_filter": {
+    "plan": [
+      [
+        4,
+        0,
+        0,
+        "SCAN nodes"
+      ],
+      [
+        50,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ],
+    "median_ms": 0.7776811253279448,
+    "rows": 20
+  },
+  "peers_page": {
+    "plan": [
+      [
+        5,
+        0,
+        0,
+        "SCAN peers USING INDEX idx_peers_time"
+      ]
+    ],
+    "median_ms": 0.01923111267387867,
+    "rows": 20
+  },
+  "peers_filter": {
+    "plan": [
+      [
+        5,
+        0,
+        0,
+        "SCAN peers USING INDEX idx_peers_time"
+      ]
+    ],
+    "median_ms": 1.4584721066057682,
+    "rows": 20
+  },
+  "last_queries": {
+    "plan": [
+      [
+        8,
+        0,
+        0,
+        "SCAN search_queries"
+      ],
+      [
+        10,
+        0,
+        0,
+        "USE TEMP B-TREE FOR GROUP BY"
+      ],
+      [
+        60,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ],
+    "median_ms": 0.9754018392413855,
+    "rows": 10
+  },
+  "node_lookup": {
+    "plan": [
+      [
+        3,
+        0,
+        0,
+        "SEARCH nodes USING INDEX sqlite_autoindex_nodes_1 (dst=?)"
+      ]
+    ],
+    "median_ms": 0.0036139972507953644,
+    "rows": 0
+  },
+  "recent_nodes": {
+    "plan": [
+      [
+        4,
+        0,
+        0,
+        "SEARCH nodes USING INDEX idx_nodes_time (time>?)"
+      ]
+    ],
+    "median_ms": 0.6143259815871716,
+    "rows": 1982
+  },
+  "citation_lookup": {
+    "plan": [
+      [
+        3,
+        0,
+        0,
+        "SEARCH citations USING INDEX idx_citations_target (target_address=?)"
+      ]
+    ],
+    "median_ms": 0.002569984644651413,
+    "rows": 0
+  },
+  "counts": {
+    "nodes": 4636,
+    "peers": 63702,
+    "citations": 16999,
+    "search_queries": 3811,
+    "user_search_history": 3209,
+    "crawl_visited_urls": 103606
+  },
+  "visited_http": 12808,
+  "visited_non_mu": 33865,
+  "db_sizes": [
+    [
+      "crawl_visited_urls",
+      11685888
+    ],
+    [
+      "sqlite_autoindex_crawl_visited_urls_1",
+      11509760
+    ],
+    [
+      "idx_crawl_visited_url",
+      11509760
+    ],
+    [
+      "peers",
+      8896512
+    ],
+    [
+      "sqlite_autoindex_peers_1",
+      2891776
+    ],
+    [
+      "idx_peers_identity",
+      2879488
+    ],
+    [
+      "idx_crawl_visited_at",
+      2539520
+    ],
+    [
+      "idx_peers_time",
+      2224128
+    ],
+    [
+      "citations",
+      1433600
+    ],
+    [
+      "sqlite_autoindex_citations_1",
+      1396736
+    ],
+    [
+      "idx_citations_src",
+      765952
+    ],
+    [
+      "idx_citations_target",
+      757760
+    ],
+    [
+      "nodes",
+      737280
+    ],
+    [
+      "user_search_history",
+      225280
+    ],
+    [
+      "idx_nodes_identity",
+      208896
+    ],
+    [
+      "sqlite_autoindex_nodes_1",
+      200704
+    ],
+    [
+      "idx_user_search_history_time",
+      188416
+    ],
+    [
+      "idx_user_search_history_identity",
+      155648
+    ],
+    [
+      "idx_nodes_time",
+      135168
+    ],
+    [
+      "search_queries",
+      98304
+    ],
+    [
+      "idx_search_queries_created",
+      73728
+    ],
+    [
+      "sqlite_sequence",
+      4096
+    ],
+    [
+      "sqlite_schema",
+      4096
+    ]
+  ]
+}

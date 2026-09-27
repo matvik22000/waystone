@@ -1,0 +1,5 @@
+{"stage": "import", "memory": ["VmHWM:\t  134344 kB", "VmRSS:\t  134344 kB", "VmSwap:\t       0 kB"]}
+{"stage": "searcher", "memory": ["VmHWM:\t  134752 kB", "VmRSS:\t  134752 kB", "VmSwap:\t       0 kB"]}
+{"stage": "collect", "memory": ["VmHWM:\t  135964 kB", "VmRSS:\t  135964 kB", "VmSwap:\t       0 kB"]}
+{"stage": "fields_end", "memory": ["VmHWM:\t  139656 kB", "VmRSS:\t  137056 kB", "VmSwap:\t       0 kB"]}
+{"stage": "closed", "memory": ["VmHWM:\t  139656 kB", "VmRSS:\t  137060 kB", "VmSwap:\t       0 kB"]}

@@ -1,0 +1,28 @@
+start ['VmHWM:\t   13944 kB', 'VmRSS:\t   13944 kB', 'VmSwap:\t       0 kB']
+import ['VmHWM:\t  133772 kB', 'VmRSS:\t  133772 kB', 'VmSwap:\t       0 kB']
+searcher allocations (250863896, 250864016)
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/structfile.py:357: size=239 MiB, count=21, average=11.4 MiB
+<frozen importlib._bootstrap_external>:729: size=136 KiB, count=969, average=144 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/filetables.py:272: size=120 KiB, count=2771, average=44 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/structfile.py:245: size=59.5 KiB, count=605, average=101 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/index.py:656: size=16.5 KiB, count=146, average=116 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:156: size=4992 B, count=78, average=64 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:1553: size=4182 B, count=9, average=465 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:934: size=3996 B, count=9, average=444 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:101: size=3644 B, count=9, average=405 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:1348: size=3327 B, count=9, average=370 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/compound.py:121: size=2864 B, count=21, average=136 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:65: size=2369 B, count=9, average=263 B
+fields allocations (251294570, 251313187)
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/structfile.py:357: size=239 MiB, count=23, average=10.4 MiB
+<frozen importlib._bootstrap_external>:729: size=296 KiB, count=2204, average=138 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/filetables.py:272: size=120 KiB, count=2771, average=44 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/filedb/structfile.py:245: size=59.5 KiB, count=605, average=101 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/index.py:656: size=16.5 KiB, count=146, average=116 B
+/home/matvey/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/tracemalloc.py:67: size=7360 B, count=115, average=64 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/columns.py:1276: size=6528 B, count=11, average=593 B
+/home/matvey/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/tracemalloc.py:193: size=6000 B, count=125, average=48 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:156: size=4992 B, count=78, average=64 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:1553: size=4182 B, count=9, average=465 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/searching.py:934: size=3996 B, count=9, average=444 B
+/tmp/waystone-audit/venv311/lib/python3.11/site-packages/whoosh/sorting.py:68: size=3958 B, count=10, average=396 B
