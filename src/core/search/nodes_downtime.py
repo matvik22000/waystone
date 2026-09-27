@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import exp, isfinite
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Optional, Tuple, Union, List
 from scipy.stats import gamma  # type: ignore
@@ -60,6 +61,7 @@ def fit_site_params(
 
 
 # --- Gamma quantile (ppf) helpers -------------------------------------------------
+@lru_cache(maxsize=4096)
 def gamma_ppf(p: float, alpha: float, beta: float) -> float:
     return float(gamma.ppf(p, a=alpha, scale=1.0 / beta))
 

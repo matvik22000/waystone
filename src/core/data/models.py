@@ -34,6 +34,7 @@ class Node(Base):
     __table_args__ = (
         Index("idx_nodes_identity", "identity"),
         Index("idx_nodes_time", "time"),
+        Index("idx_nodes_listing", removed, rank.desc(), time.desc()),
     )
 
 

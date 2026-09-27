@@ -26,6 +26,10 @@ def init_db() -> None:
     _migrate_peers_schema_drop_destination()
     _migrate_citations_add_removed()
     _migrate_citations_add_source_page()
+    with _engine.begin() as conn:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_nodes_listing ON nodes(removed, rank DESC, time DESC)"
+        ))
 
 
 def _migrate_nodes_schema_drop_destination() -> None:

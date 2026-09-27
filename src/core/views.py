@@ -15,8 +15,8 @@ from src.core.data.nods_and_peers import (
     count_peers_filtered,
     count_nodes,
     find_node_by_address,
-    find_owner,
-    get_nodes_for_addresses,
+    find_owners,
+    get_nodes_for_addresses_page,
     get_nodes_page,
     get_peers_page,
 )
@@ -114,10 +114,8 @@ def nodes_mu(
         mention_node = find_node_by_address(mentions_for)
         if mention_node:
             mentions_for_name = mention_node["name"]
-        mention_nodes = get_nodes_for_addresses(mentioned_at)
-        total_items = len(mention_nodes)
-        start, end = get_page_bounds(page, page_size)
-        for n in mention_nodes[start:end]:
+        total_items, mention_nodes = get_nodes_for_addresses_page(mentioned_at, page, page_size)
+        for n in mention_nodes:
             items.append((n["destination"], n))
     elif query:
         total_items = count_nodes_filtered(query=query)
@@ -128,6 +126,8 @@ def nodes_mu(
         for n in get_nodes_page(page=page, page_size=page_size):
             items.append((n["destination"], n))
 
+    owners = find_owners(n["identity"] for _, n in items)
+    citation_counts = citations.get_amounts_for(n["dst"] for _, n in items)
     for dst, n in items:
         last_online = datetime.datetime.fromtimestamp(
             n["time"], tz=datetime.timezone.utc
@@ -136,8 +136,8 @@ def nodes_mu(
             **n,
             **dict(
                 dst=format_for_link(dst),
-                owner=find_owner(n["identity"]) or ("Unknown", "Unknown"),
-                citations=citations.get_amount_for(format_for_link(dst)),
+                owner=owners.get(n["identity"], ("Unknown", "Unknown")),
+                citations=citation_counts.get(n["dst"], 0),
                 last_announce=last_online.strftime(TIME_FORMAT),
                 since_announce=format_timedelta(since_online(last_online)),
             )}

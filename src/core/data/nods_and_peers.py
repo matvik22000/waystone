@@ -109,15 +109,21 @@ def get_peers_page(page: int = 0, page_size: int = 100, query: str = "") -> list
         return [_peer_to_dict(r) for r in rows]
 
 
-def get_nodes_for_addresses(addresses: tp.Iterable[str]) -> list[dict]:
+def get_nodes_for_addresses_page(
+    addresses: tp.Iterable[str], page: int, page_size: int
+) -> tuple[int, list[dict]]:
     addresses = list(addresses)
     if not addresses:
-        return []
+        return 0, []
     with get_session() as session:
+        conditions = (Node.dst.in_(addresses), Node.removed.is_(False))
+        total = session.scalar(select(func.count(Node.id)).where(*conditions))
+        # Keep the address-index order used before the listing index was added.
         rows = session.execute(
-            select(Node).where(Node.dst.in_(addresses), Node.removed.is_(False))
+            select(Node).where(*conditions).order_by(Node.dst)
+            .offset(page * page_size).limit(page_size)
         ).scalars().all()
-        return [_node_to_dict(r) for r in rows]
+        return total, [_node_to_dict(r) for r in rows]
 
 
 def get_recent_nodes_for_crawl(within_seconds: int = 86400) -> list[str]:
@@ -240,6 +246,22 @@ def find_owner(identity: str) -> tp.Optional[tp.Tuple[str, str]]:
         if row is None:
             return None
         return row.name, row.dst
+
+
+def find_owners(identities: tp.Iterable[str]) -> dict[str, tuple[str, str]]:
+    identities = set(identities)
+    if not identities:
+        return {}
+    with get_session() as session:
+        rows = session.execute(
+            select(Peer.identity, Peer.name, Peer.dst)
+            .where(Peer.identity.in_(identities)).order_by(Peer.id)
+        )
+        owners = {}
+        for identity, name, dst in rows:
+            # Match find_owner: first peer for an identity, not the last one.
+            owners.setdefault(identity, (name, dst))
+        return owners
 
 
 def find_node_by_address(address: str) -> tp.Optional[dict]:

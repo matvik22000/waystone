@@ -1,7 +1,7 @@
 import time
-from typing import List
+from typing import Iterable, List
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from src.core.crawler.rns_request import address_from_url
 from src.core.data.db import get_session
@@ -67,7 +67,19 @@ class Citations:
             return set(rows) if rows else set()
 
     def get_amount_for(self, address: str) -> int:
-        return len(self.get_citations_for(address))
+        return self.get_amounts_for([address]).get(address, 0)
+
+    def get_amounts_for(self, addresses: Iterable[str]) -> dict[str, int]:
+        addresses = set(addresses)
+        if not addresses:
+            return {}
+        with get_session() as session:
+            rows = session.execute(
+                select(Citation.target_address, func.count(func.distinct(Citation.src_address)))
+                .where(Citation.target_address.in_(addresses), Citation.removed.is_(False))
+                .group_by(Citation.target_address)
+            )
+            return dict(rows.all())
 
 
 citations = Citations()
