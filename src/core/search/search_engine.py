@@ -3,18 +3,17 @@ import os
 import re
 import time
 from collections import OrderedDict
-from dataclasses import dataclass, asdict
-from functools import lru_cache
+from dataclasses import replace
 from threading import Lock
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
-from sqlalchemy import select
 from whoosh.analysis import StemmingAnalyzer, NgramWordAnalyzer
 from whoosh.fields import *
 from whoosh.filedb.filestore import FileStorage
 from whoosh.highlight import Formatter, get_text
 from whoosh.qparser import MultifieldParser, OrGroup
 from whoosh import scoring
+from whoosh.searching import Results
 
 from src.core.data import get_path
 from src.core.search.models import SearchDocument, SearchResult
@@ -39,7 +38,7 @@ class SearchEngine:
         self.ranker = ranker
         self._index_queue: list[SearchDocument] = []
         self._index_batch_size = 10
-        self._optimize_every_batches = 25
+        self._optimize_every_batches = 250
         self._batches_since_optimize = 0
         self._query_cache: "OrderedDict[str, tuple[float, list[SearchResult]]]" = OrderedDict()
 
@@ -50,9 +49,9 @@ class SearchEngine:
         storage_path = get_path("search_index")
         if not os.path.exists(storage_path):
             os.makedirs(storage_path)
-            self.ix = FileStorage(storage_path).create_index(self.schema)
+            self.ix = FileStorage(storage_path, supports_mmap=False).create_index(self.schema)
         else:
-            self.ix = FileStorage(storage_path).open_index()
+            self.ix = FileStorage(storage_path, supports_mmap=False).open_index()
 
         self.logger = logging.getLogger("search")
 
@@ -75,12 +74,12 @@ class SearchEngine:
         if not self._index_queue:
             return
         docs = self._index_queue
-        self._index_queue = []
 
         optimize_now = force_optimize or (
                 self._batches_since_optimize + 1 >= self._optimize_every_batches
         )
         self._commit_documents(docs, optimize=optimize_now)
+        self._index_queue = []
 
         if optimize_now:
             self._batches_since_optimize = 0
@@ -88,16 +87,22 @@ class SearchEngine:
             self._batches_since_optimize += 1
 
     def _commit_documents(self, docs: Sequence[SearchDocument], optimize: bool):
-        writer = self.ix.writer()
-        for doc in docs:
-            doc_dict = doc.to_dict()
-            # Фильтруем только поля, которые есть в схеме
-            filtered_dict = {
-                k: v for k, v in doc_dict.items() if k in self.schema.stored_names()
-            }
-            filtered_dict["raw"] = doc.text
-            writer.update_document(**filtered_dict)
-        writer.commit(optimize=optimize)
+        writer = self.ix.writer(limitmb=32)
+        try:
+            for doc in docs:
+                doc_dict = doc.to_dict()
+                filtered_dict = {
+                    k: v for k, v in doc_dict.items() if k in self.schema.stored_names()
+                }
+                filtered_dict["raw"] = doc.text
+                writer.update_document(**filtered_dict)
+            writer.commit(optimize=optimize)
+        except Exception:
+            if not writer.is_closed:
+                writer.cancel()
+            raise
+        with self.__cache_lock:
+            self._query_cache.clear()
 
     def delete_by_address(self, address: str | Sequence[str]):
         addresses = [address] if isinstance(address, str) else list(address)
@@ -114,49 +119,40 @@ class SearchEngine:
         """Возвращает количество документов в индексе"""
         return self.ix.doc_count_all()
 
-    def query(
-            self, q: str, highlight: bool = True
-    ) -> List[SearchResult]:
-        """Выполняет поиск по запросу"""
+    def query(self, q: str) -> List[SearchResult]:
+        """Rank up to 500 candidates; highlight only the selected page separately."""
         cache_key = self._normalize_query_cache_key(q)
         cached = self._get_cached_results(cache_key)
         if cached is not None:
             return cached
 
-        ranked = self._query_impl(highlight, q)
+        ranked = self._query_impl(q)
 
         self._set_cached_results(cache_key, ranked)
         return ranked
 
-    def _query_impl(self, highlight, q):
+    def _query_impl(self, q):
         fields = ["url", "text", "nodeName", "owner", "address"]
         search_results: list[SearchResult] = []
         with self.ix.searcher(weighting=scoring.BM25F()) as searcher:
-            # We intentionally fetch full candidate set here and cache the globally ranked
-            # result list, so pagination can reuse it cheaply for a few minutes.
+            # ponytail: cap candidates at 500; increase only after measuring recall and RAM.
             results = searcher.search(
                 MultifieldParser(
                     fields, schema=self.schema, group=OrGroup
                 ).parse(q),
-                limit=None,
+                limit=500,
             )
-            results.formatter = MuBoldFormatter()
-            results.fragmenter.maxchars = 100
 
             for r in results:
                 # Создаем результат поиска
                 result = SearchResult(
                     url=r["url"],
-                    text=r["text"],
+                    text="",
                     owner=r["owner"],
                     address=r["address"],
                     name=r.get("nodeName") or r["url"],
                     score=r.score,
                 )
-
-                if highlight:
-                    if r.get("text") and isinstance(r.get("text"), str):
-                        result.text = r.highlights("text") or r["text"][:200]
 
                 search_results.append(result)
 
@@ -164,6 +160,25 @@ class SearchEngine:
         ranked = self.ranker.rerank(search_results)
         self.logger.debug("reranked results: %s", ranked)
         return ranked
+
+    def highlight_results(self, q: str, entries: Sequence[SearchResult]) -> List[SearchResult]:
+        if not entries:
+            return []
+        with self.ix.searcher() as searcher:
+            parsed = MultifieldParser(
+                ["url", "text", "nodeName", "owner", "address"],
+                schema=self.schema, group=OrGroup,
+            ).parse(q)
+            # Resolve stable URLs in this reader: docnums can change after a merge.
+            found = [(entry, searcher.document_number(url=entry.url)) for entry in entries]
+            found = [(entry, docnum) for entry, docnum in found if docnum is not None]
+            results = Results(searcher, parsed, [(entry.score, docnum) for entry, docnum in found])
+            results.formatter = MuBoldFormatter()
+            results.fragmenter.maxchars = 100
+            return [
+                replace(entry, text=hit.highlights("text") or hit["text"][:200])
+                for (entry, _), hit in zip(found, results)
+            ]
 
     def save(self, path: str):
         """Сохраняет индекс в указанную директорию"""
@@ -190,7 +205,7 @@ class SearchEngine:
                 self._query_cache.pop(key)
                 return None
             self._query_cache.move_to_end(key)
-            return results.copy()
+            return [replace(result) for result in results]
 
     def _set_cached_results(self, key: str, results: List[SearchResult]) -> None:
         if not key:
@@ -199,7 +214,7 @@ class SearchEngine:
         with self.__cache_lock:
             self._query_cache[key] = (
                 now_ts + self._query_cache_ttl_seconds,
-                results.copy(),
+                [replace(result) for result in results],
             )
             self._query_cache.move_to_end(key)
             while len(self._query_cache) > self._query_cache_max_entries:

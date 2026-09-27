@@ -25,6 +25,7 @@ def init_db() -> None:
     _migrate_nodes_add_survival_columns()
     _migrate_peers_schema_drop_destination()
     _migrate_citations_add_removed()
+    _migrate_citations_add_source_page()
 
 
 def _migrate_nodes_schema_drop_destination() -> None:
@@ -164,6 +165,33 @@ def _migrate_citations_add_removed() -> None:
         conn.execute(
             text("ALTER TABLE citations ADD COLUMN removed BOOLEAN NOT NULL DEFAULT 0")
         )
+
+
+def _migrate_citations_add_source_page() -> None:
+    with _engine.begin() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(citations)"))}
+        if "src_url" in columns:
+            return
+        # SQLite DDL needs an explicit transaction for an atomic table rebuild.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        conn.execute(text(
+            "CREATE TABLE citations_new ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "target_address VARCHAR(32) NOT NULL, src_address VARCHAR(32) NOT NULL, "
+            "src_url TEXT NOT NULL DEFAULT '', created_at FLOAT NOT NULL, "
+            "removed BOOLEAN NOT NULL DEFAULT 0, "
+            "CONSTRAINT uq_citations_target_page UNIQUE(target_address, src_address, src_url))"
+        ))
+        # Old edges have no recoverable page provenance; retain until the source is crawled.
+        conn.execute(text(
+            "INSERT INTO citations_new (id, target_address, src_address, created_at, removed) "
+            "SELECT id, target_address, src_address, created_at, removed FROM citations"
+        ))
+        conn.execute(text("DROP TABLE citations"))
+        conn.execute(text("ALTER TABLE citations_new RENAME TO citations"))
+        conn.execute(text("CREATE INDEX idx_citations_target ON citations(target_address)"))
+        conn.execute(text("CREATE INDEX idx_citations_src ON citations(src_address)"))
+        conn.execute(text("CREATE INDEX idx_citations_page ON citations(src_url)"))
 
 
 @contextmanager

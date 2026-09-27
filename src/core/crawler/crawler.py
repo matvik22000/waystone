@@ -145,6 +145,8 @@ class Crawler:
         self.enqueue_url(url, source_url="seed")
 
     def enqueue_url(self, url: str, source_url: str = "") -> bool:
+        if url.lower().startswith(("http:", "https:")):
+            return False
         with self._enqueue_lock:
             if self._queue.full():
                 self._logger.warning(

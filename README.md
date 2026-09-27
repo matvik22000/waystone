@@ -117,3 +117,22 @@ To migrate existing JSON data into SQLite once, run (with env set):
 ```bash
 python -m src.core.data.migrate_json_to_sqlite
 ```
+### Search and crawl limits
+
+Search ranks the best 500 Whoosh candidates, then keeps up to two pages per node.
+Only the requested result page is highlighted; the cached ranking contains no page text.
+Whoosh mmap is disabled, the writer pool budget is 32 MiB (not a hard RSS limit),
+and full optimization runs every 250 batches of 10 documents instead of every 25 batches.
+HTTP(S) links are rejected before entering the crawl queue or visited table.
+
+Citations are tracked per source page and combined into node-level edges. Startup
+migrates existing citations automatically. Legacy edges have no recoverable source
+page; they are retired on the first successful crawl of their source node, and the
+node's graph is rebuilt as its pages are revisited. A full recrawl is needed to
+recover the complete graph. Stale-node removal remains unchanged (14 days by default).
+
+Run the isolated regression check with the project dependencies installed:
+
+```sh
+python tests/check_search_updates.py
+```

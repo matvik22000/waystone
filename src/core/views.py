@@ -227,7 +227,7 @@ def search(
     entries_all = search_engine.query(query)
     total_items = len(entries_all)
     start, end = get_page_bounds(page, page_size)
-    entries = entries_all[start:end]
+    entries = search_engine.highlight_results(query, entries_all[start:end])
     for e in entries:
         e.text = format_text(e.text)
         if e.time:

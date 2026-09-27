@@ -60,11 +60,13 @@ class Citation(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     target_address: Mapped[str] = mapped_column(String(32), nullable=False)
     src_address: Mapped[str] = mapped_column(String(32), nullable=False)
+    src_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
     removed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
-        UniqueConstraint("target_address", "src_address", name="uq_citations_target_src"),
+        UniqueConstraint("target_address", "src_address", "src_url", name="uq_citations_target_page"),
+        Index("idx_citations_page", "src_url"),
         Index("idx_citations_target", "target_address"),
         Index("idx_citations_src", "src_address"),
     )

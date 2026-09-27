@@ -1,7 +1,7 @@
 import time
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.core.crawler.rns_request import address_from_url
 from src.core.data.db import get_session
@@ -26,8 +26,12 @@ class Citations:
         now_ = _now()
 
         with get_session() as session:
+            # Replace untraceable legacy edges as page-level evidence becomes available.
+            session.execute(update(Citation).where(
+                Citation.src_address == src_address, Citation.src_url == ""
+            ).values(removed=True))
             existing_rows = session.execute(
-                select(Citation).where(Citation.src_address == src_address)
+                select(Citation).where(Citation.src_url == src)
             ).scalars().all()
             existing_by_target = {row.target_address: row for row in existing_rows}
 
@@ -46,6 +50,7 @@ class Citations:
                     Citation(
                         target_address=target_address,
                         src_address=src_address,
+                        src_url=src,
                         created_at=now_,
                         removed=False,
                     )
