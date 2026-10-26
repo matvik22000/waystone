@@ -28,6 +28,9 @@ def init_db() -> None:
     _migrate_citations_add_source_page()
     with _engine.begin() as conn:
         conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_citations_src_page ON citations(src_address, src_url)"
+        ))
+        conn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_nodes_listing ON nodes(removed, rank DESC, time DESC)"
         ))
 

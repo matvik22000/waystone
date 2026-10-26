@@ -70,6 +70,7 @@ class Citation(Base):
         Index("idx_citations_page", "src_url"),
         Index("idx_citations_target", "target_address"),
         Index("idx_citations_src", "src_address"),
+        Index("idx_citations_src_page", "src_address", "src_url"),
     )
 
 

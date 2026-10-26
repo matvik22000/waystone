@@ -22,6 +22,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # Existing installations also get the index; repeated startup is harmless.
     with _engine.begin() as conn:
         conn.exec_driver_sql("DROP INDEX idx_nodes_listing")
+        conn.exec_driver_sql("DROP INDEX idx_citations_src_page")
     init_db()
     init_db()
     with get_session() as session:
@@ -35,6 +36,12 @@ with tempfile.TemporaryDirectory() as tmp:
             for page in ("one", "two"):
                 session.add(Citation(target_address="f" * 32, src_address=f"{i:032x}",
                                      src_url=f"{i:032x}:/{page}", created_at=0, removed=i == 43))
+
+    with _engine.connect() as conn:
+        plan = str(conn.exec_driver_sql(
+            "EXPLAIN QUERY PLAN UPDATE citations SET removed=1 "
+            "WHERE src_address=? AND src_url=?", ("a" * 32, "")).all())
+        assert "idx_citations_src_page (src_address=? AND src_url=?)" in plan, plan
 
     queries = []
     def record(conn, cursor, statement, parameters, context, many):
