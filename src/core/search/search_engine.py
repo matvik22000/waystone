@@ -127,9 +127,14 @@ class SearchEngine:
         if not addresses:
             return
         writer = self.ix.writer()
-        for addr in addresses:
-            writer.delete_by_term("address", addr)
-        writer.commit(optimize=True)
+        try:
+            for addr in addresses:
+                writer.delete_by_term("address", addr)
+            writer.commit()
+        except Exception:
+            if not writer.is_closed:
+                writer.cancel()
+            raise
         with self.__cache_lock:
             self._query_cache.clear()
 
