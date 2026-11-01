@@ -74,9 +74,11 @@ class _Downloader(Thread):
             while self._alive:
                 try:
                     url = self._queue.get(timeout=1)
-                    with self._loading():
-                        self._process_url(url)
-                    self._queue.task_done()
+                    try:
+                        with self._loading():
+                            self._process_url(url)
+                    finally:
+                        self._queue.task_done()
                     self.counter += 1
                 except Empty:
                     pass
@@ -106,8 +108,10 @@ class _Downloader(Thread):
     @contextmanager
     def _loading(self):
         self.downloading = True
-        yield
-        self.downloading = False
+        try:
+            yield
+        finally:
+            self.downloading = False
 
 
 class Crawler:
@@ -168,6 +172,8 @@ class Crawler:
         self._logger.debug("Stopping all threads")
         for t in self._threads:
             t.stop()
+        for t in self._threads:
+            t.join()
 
     def total_crawled(self) -> int:
         total = 0
@@ -177,16 +183,10 @@ class Crawler:
 
     def join(self) -> int:
         try:
-            while not (self.finished() and self._queue.empty()):
-                sleep(1)
-
-            self.stop()
-            # self._queue.join()
-            total = datetime.datetime.now() - self.__started_at
-            self._logger.info("Crawl finished in %s", total)
-            self._logger.info("Crawled %s urls", self.total_crawled())
-        except KeyboardInterrupt:
-            self.stop()
+            self._queue.join()
         finally:
-            return self.total_crawled()
-
+            self.stop()
+        total = datetime.datetime.now() - self.__started_at
+        self._logger.info("Crawl finished in %s", total)
+        self._logger.info("Crawled %s urls", self.total_crawled())
+        return self.total_crawled()

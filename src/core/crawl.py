@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 import typing as tp
 from typing import Callable
+from threading import Lock
 
 import RNS
 
@@ -16,6 +17,7 @@ from src.core.crawler.rns_request import address_from_url, request
 from src.core.data.nods_and_peers import get_recent_nodes_for_crawl
 
 logger = logging.getLogger("crawler")
+_crawl_lock = Lock()
 
 # Компилируем регулярки один раз
 _RE_FB = re.compile(r"`[fb]")
@@ -124,21 +126,32 @@ def crawl(
         update_citations: Callable[[str, tp.List[str]], None],
 ):
     logger = logging.getLogger("crawl-scheduler")
-    crawler = Crawler(
-        load,
-        lambda doc: extract(doc, get_node_by_address, update_citations),
-        queue_maxsize=CONFIG.CRAWLER_QUEUE_MAXSIZE,
-        visited_cache_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS,
-    )
-    recent_nodes = get_recent_nodes_for_crawl(within_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS)
-    if not recent_nodes:
-        logger.warning("No known nodes to crawl")
+    if not _crawl_lock.acquire(blocking=False):
+        logger.info("Skipping crawl: previous crawl is still running")
         return
-    logger.info("starting crawl")
-    for dst in recent_nodes:
-        crawler.add_url(dst + ":/page/index.mu")
-    logger.info("enqueued %s urls", len(recent_nodes))
-    crawler.start(CONFIG.CRAWLER_THREADS)
-    crawler.join()
-    # Flush any remaining batched documents after crawl completion.
-    search_engine.flush_index_queue()
+    crawler = None
+    try:
+        crawler = Crawler(
+            load,
+            lambda doc: extract(doc, get_node_by_address, update_citations),
+            queue_maxsize=CONFIG.CRAWLER_QUEUE_MAXSIZE,
+            visited_cache_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS,
+        )
+        recent_nodes = get_recent_nodes_for_crawl(within_seconds=CONFIG.CRAWLER_VISITED_CACHE_SECONDS)
+        if not recent_nodes:
+            logger.warning("No known nodes to crawl")
+            return
+        logger.info("starting crawl")
+        for dst in recent_nodes:
+            crawler.add_url(dst + ":/page/index.mu")
+        logger.info("enqueued %s urls", len(recent_nodes))
+        crawler.start(CONFIG.CRAWLER_THREADS)
+        crawler.join()
+        # Flush any remaining batched documents after crawl completion.
+        search_engine.flush_index_queue()
+    finally:
+        try:
+            if crawler is not None:
+                crawler.stop()
+        finally:
+            _crawl_lock.release()
