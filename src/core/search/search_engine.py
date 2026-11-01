@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import shutil
 import time
 from collections import OrderedDict
 from dataclasses import replace
@@ -14,6 +15,7 @@ from whoosh.highlight import Formatter, get_text
 from whoosh.qparser import MultifieldParser, OrGroup
 from whoosh import scoring
 from whoosh.searching import Results
+from whoosh.index import LockError
 
 from src.core.data import get_path
 from src.core.search.models import SearchDocument, SearchResult
@@ -54,6 +56,22 @@ class SearchEngine:
             self.ix = FileStorage(storage_path, supports_mmap=False).open_index()
 
         self.logger = logging.getLogger("search")
+        self._cleanup_stale_temp()
+
+    def _cleanup_stale_temp(self):
+        # OOM/SIGKILL bypasses writer cleanup; never touch a live writer's files.
+        lock = self.ix.lock("WRITELOCK")
+        if not lock.acquire():
+            raise LockError("Index is being written; refusing temporary-file cleanup")
+        try:
+            path = os.path.join(self.ix.storage.folder, self.ix.indexname + ".tmp")
+            if os.path.islink(path):
+                raise ValueError("Refusing to clean a symlinked index temporary directory")
+            if os.path.exists(path):
+                shutil.rmtree(path)
+                self.logger.info("Removed stale index temporary files: %s", path)
+        finally:
+            lock.release()
 
     def index_documents(self, docs: Sequence[SearchDocument]):
         """Индексирует документы в поисковой системе"""
